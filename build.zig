@@ -36,6 +36,11 @@ pub fn build(b: *std.build.Builder) void {
     exe_tests.setTarget(target);
     exe_tests.setBuildMode(mode);
 
+    const lib_tests = b.addTest("src/fusion.zig");
+    lib_tests.setTarget(target);
+    lib_tests.setBuildMode(mode);
+
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
+    test_step.dependOn(&lib_tests.step);
 }
