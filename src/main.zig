@@ -74,7 +74,20 @@ pub fn main() void {}
 
 test "generate wat for a non exported function" {
     const allocator = std.testing.allocator;
-    const module = Module{ .funcs = &.{.{ .name = "add", .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } }, .result = .i32, .ops = &.{ .{ .local_get = "lhs" }, .{ .local_get = "rhs" }, .i32_add } }} };
+    const module = Module{
+        .funcs = &.{
+            .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .result = .i32,
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
+    };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
     const expected =
@@ -89,7 +102,21 @@ test "generate wat for a non exported function" {
 
 test "generate wat for a exported function" {
     const allocator = std.testing.allocator;
-    const module = Module{ .funcs = &.{.{ .name = "add", .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } }, .result = .i32, .ops = &.{ .{ .local_get = "lhs" }, .{ .local_get = "rhs" }, .i32_add }, .exported = true }} };
+    const module = Module{
+        .funcs = &.{
+            .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .result = .i32,
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+                .exported = true,
+            },
+        },
+    };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
     const expected =
