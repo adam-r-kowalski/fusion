@@ -6,8 +6,8 @@ pub const Type = enum {
     f32,
     f64,
 
-    pub fn format(value: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        switch (value) {
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        switch (self) {
             .i32 => try writer.writeAll("i32"),
             .i64 => try writer.writeAll("i64"),
             .f32 => try writer.writeAll("f32"),
@@ -19,13 +19,17 @@ pub const Type = enum {
 pub const Param = struct { name: []const u8, type: Type };
 
 pub const Op = union(enum) {
+	call: []const u8,
     local_get: []const u8,
     i32_add,
+	i32_const: i32,
 
-    pub fn format(value: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-        switch (value) {
-            .local_get => |name| try std.fmt.format(writer, "(local.get ${s})", .{name}),
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        switch (self) {
+            .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
+            .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
             .i32_add => try writer.writeAll("i32.add"),
+			.i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
         }
     }
 };
@@ -43,11 +47,11 @@ pub const Module = struct { funcs: []const Func };
 pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
     var output = std.ArrayList(u8).init(allocator);
     const writer = output.writer();
-    try writer.writeAll("(module\n");
+    try writer.writeAll("(module");
     var exports = std.ArrayList([]const u8).init(allocator);
     defer exports.deinit();
     for (module.funcs) |func| {
-        try std.fmt.format(writer, "  (func ${s}", .{func.name});
+        try std.fmt.format(writer, "\n\n  (func ${s}", .{func.name});
         for (func.params) |param| {
             try std.fmt.format(writer, " (param ${s} ${})", .{ param.name, param.type });
         }
@@ -90,6 +94,7 @@ test "generate wat for a non exported function" {
     defer allocator.free(actual);
     const expected =
         \\(module
+		\\
         \\  (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
         \\   (local.get $lhs)
         \\   (local.get $rhs)
@@ -119,12 +124,56 @@ test "generate wat for a exported function" {
     defer allocator.free(actual);
     const expected =
         \\(module
+		\\
         \\  (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
         \\   (local.get $lhs)
         \\   (local.get $rhs)
         \\   i32.add)
         \\
         \\  (export "add" (func $add)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "generate wat for a function call" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .funcs = &.{
+            .{
+                .name = "getAnswer",
+                .params = &.{},
+                .result = .i32,
+                .ops = &.{
+                    .{ .i32_const = 42 },
+                },
+            },
+            .{
+                .name = "getAnswerPlus1",
+                .params = &.{},
+                .result = .i32,
+                .ops = &.{
+                    .{ .call = "getAnswer" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                },
+                .exported = true,
+            },
+        },
+    };
+    const actual = try wat(allocator, module);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+		\\
+        \\  (func $getAnswer (result i32)
+        \\   (i32.const 42))
+		\\
+        \\  (func $getAnswerPlus1 (result i32)
+		\\   (call $getAnswer)
+		\\   (i32.const 1)
+        \\   i32.add)
+        \\
+        \\  (export "getAnswerPlus1" (func $getAnswerPlus1)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
