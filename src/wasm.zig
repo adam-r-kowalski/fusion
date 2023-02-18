@@ -24,6 +24,8 @@ pub const Param = struct {
 pub const Op = union(enum) {
     call: []const u8,
     local_get: []const u8,
+    global_get: []const u8,
+    global_set: []const u8,
     i32_add,
     i32_const: i32,
 
@@ -31,6 +33,8 @@ pub const Op = union(enum) {
         switch (self) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
             .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
+            .global_get => |value| try std.fmt.format(writer, "(global.get ${s})", .{value}),
+            .global_set => |value| try std.fmt.format(writer, "(global.set ${s})", .{value}),
             .i32_add => try writer.writeAll("i32.add"),
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
         }
@@ -53,7 +57,14 @@ pub const Import = union(enum) {
     },
 };
 
+pub const Global = struct {
+    name: []const u8,
+    path: [2][]const u8,
+    type: Type,
+};
+
 pub const Module = struct {
+    globals: []const Global = &.{},
     imports: []const Import = &.{},
     funcs: []const Func = &.{},
 };
@@ -64,6 +75,15 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
     try writer.writeAll("(module");
     var exports = std.ArrayList([]const u8).init(allocator);
     defer exports.deinit();
+    for (module.globals) |global| {
+        const fmt = "\n\n    (global ${s} (import \"{s}\" \"{s}\") (mut {}))";
+        try std.fmt.format(writer, fmt, .{
+            global.name,
+            global.path[0],
+            global.path[1],
+            global.type,
+        });
+    }
     for (module.imports) |import| {
         switch (import) {
             .func => |func| {
@@ -102,7 +122,7 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
     return output.toOwnedSlice();
 }
 
-test "generate wat for a non exported function" {
+test "non exported function" {
     const allocator = std.testing.allocator;
     const module = Module{
         .funcs = &.{
@@ -131,7 +151,7 @@ test "generate wat for a non exported function" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-test "generate wat for a exported function" {
+test "exported function" {
     const allocator = std.testing.allocator;
     const module = Module{
         .funcs = &.{
@@ -163,7 +183,7 @@ test "generate wat for a exported function" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-test "generate wat for a function call" {
+test "function call" {
     const allocator = std.testing.allocator;
     const module = Module{
         .funcs = &.{
@@ -204,7 +224,7 @@ test "generate wat for a function call" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-test "generate wat for a import" {
+test "import function" {
     const allocator = std.testing.allocator;
     const module = Module{
         .imports = &.{
@@ -233,6 +253,55 @@ test "generate wat for a import" {
         \\        (call $log))
         \\
         \\    (export "logIt" (func $logIt)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "global variables" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .globals = &.{
+            .{ .name = "g", .path = .{ "js", "global" }, .type = .i32 },
+        },
+        .funcs = &.{
+            .{
+                .name = "getGlobal",
+                .result = .i32,
+                .ops = &.{
+                    .{ .global_get = "g" },
+                },
+                .exported = true,
+            },
+            .{
+                .name = "incGlobal",
+                .ops = &.{
+                    .{ .global_get = "g" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                    .{ .global_set = "g" },
+                },
+                .exported = true,
+            },
+        },
+    };
+    const actual = try wat(allocator, module);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (global $g (import "js" "global") (mut i32))
+        \\
+        \\    (func $getGlobal (result i32)
+        \\        (global.get $g))
+        \\
+        \\    (func $incGlobal
+        \\        (global.get $g)
+        \\        (i32.const 1)
+        \\        i32.add
+        \\        (global.set $g))
+        \\
+        \\    (export "getGlobal" (func $getGlobal))
+        \\    (export "incGlobal" (func $incGlobal)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
