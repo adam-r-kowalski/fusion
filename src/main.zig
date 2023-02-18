@@ -2,7 +2,7 @@ const std = @import("std");
 const fusion = @import("fusion");
 
 pub fn main() !void {
-	const module = fusion.wasm.Module{
+    const module = fusion.wasm.Module{
         .funcs = &.{
             .{
                 .name = "add",
@@ -15,6 +15,9 @@ pub fn main() !void {
                 },
             },
         },
-	};
-	std.debug.print("{}\n", .{module});
+        .exports = &.{
+            .{ .func = .{ .name = "add" } },
+        },
+    };
+    std.debug.print("{}\n", .{module});
 }
