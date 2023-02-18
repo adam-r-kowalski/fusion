@@ -56,6 +56,7 @@ pub const Import = union(enum) {
         name: []const u8,
         params: []const Type = &.{},
     },
+    memory: struct { path: [2][]const u8, size: u32 },
 };
 
 pub const Global = struct {
@@ -64,9 +65,15 @@ pub const Global = struct {
     type: Type,
 };
 
+pub const Data = struct {
+	offset: u32,
+	bytes: []const u8,
+};
+
 pub const Module = struct {
     globals: []const Global = &.{},
     imports: []const Import = &.{},
+	data: []const Data = &.{},
     funcs: []const Func = &.{},
 };
 
@@ -90,13 +97,28 @@ fn writeImports(writer: Writer, module: Module) !void {
             .func => |func| {
                 const fmt = "\n\n    (import \"{s}\" \"{s}\" (func ${s}";
                 try std.fmt.format(writer, fmt, .{ func.path[0], func.path[1], func.name });
-                for (func.params) |param| {
-                    try std.fmt.format(writer, " (param {})", .{param});
+                if (func.params.len > 0) {
+                    try writer.writeAll(" (param");
+                    for (func.params) |param| {
+                        try std.fmt.format(writer, " {}", .{param});
+                    }
+                    try writer.writeAll(")");
                 }
                 try writer.writeAll("))");
             },
+            .memory => |memory| {
+                const fmt = "\n\n    (import \"{s}\" \"{s}\" (memory {}))";
+                try std.fmt.format(writer, fmt, .{ memory.path[0], memory.path[1], memory.size });
+            },
         }
     }
+}
+
+fn writeData(writer: Writer, module: Module) !void {
+	for (module.data) |data| {
+		const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
+		try std.fmt.format(writer, fmt, .{ data.offset, data.bytes });
+	}
 }
 
 fn writeFuncs(allocator: Allocator, writer: Writer, module: Module) ![][]const u8 {
@@ -117,24 +139,25 @@ fn writeFuncs(allocator: Allocator, writer: Writer, module: Module) ![][]const u
             try exports.append(func.name);
         }
     }
-	return exports.toOwnedSlice();
+    return exports.toOwnedSlice();
 }
 
 fn writeExports(writer: Writer, exports: [][]const u8) !void {
-	for (exports) |name| {
-		try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ name, name });
-	}
+    for (exports) |name| {
+        try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ name, name });
+    }
 }
 
 pub fn wat(allocator: Allocator, module: Module) ![]u8 {
     var output = std.ArrayList(u8).init(allocator);
     const writer = output.writer();
     try writer.writeAll("(module");
-	try writeGlobals(writer, module);
-	try writeImports(writer, module);
-	const exports = try writeFuncs(allocator, writer, module);
+    try writeGlobals(writer, module);
+    try writeImports(writer, module);
+	try writeData(writer, module);
+    const exports = try writeFuncs(allocator, writer, module);
     defer allocator.free(exports);
-	try writeExports(writer, exports);
+    try writeExports(writer, exports);
     try writer.writeAll(")");
     return output.toOwnedSlice();
 }
@@ -318,8 +341,51 @@ test "global variables" {
         \\        (global.set $g))
         \\
         \\    (export "getGlobal" (func $getGlobal))
-		\\
+        \\
         \\    (export "incGlobal" (func $incGlobal)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "memory" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{ .func = .{ .path = .{ "console", "log" }, .name = "log", .params = &.{ .i32, .i32 } } },
+            .{ .memory = .{ .path = .{ "js", "mem" }, .size = 1 } },
+        },
+        .data = &.{
+            .{ .offset = 0, .bytes = "Hi" },
+        },
+        .funcs = &.{
+            .{
+                .name = "writeHi",
+                .ops = &.{
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
+                },
+                .exported = true,
+            },
+        },
+    };
+    const actual = try wat(allocator, module);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32 i32)))
+        \\
+        \\    (import "js" "mem" (memory 1))
+        \\
+        \\    (data (i32.const 0) "Hi")
+        \\
+        \\    (func $writeHi
+        \\        (i32.const 0)
+        \\        (i32.const 2)
+        \\        (call $log))
+        \\
+        \\    (export "writeHi" (func $writeHi)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
