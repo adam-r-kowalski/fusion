@@ -9,44 +9,41 @@ pub fn main() !void {
         .imports = &.{
             .{
                 .module = "js",
-                .name = "g",
+                .name = "log",
                 .desc = .{
-                    .global = .{
-                        .name = "g",
-                        .type = .i32,
-                        .mutable = true,
-                    },
+                    .func = .{ .name = "log", .params = &.{ .i32, .i32 } },
                 },
             },
+            .{ .module = "js", .name = "mem", .desc = .{ .memory = .{ .min = 1 } } },
+        },
+        .datas = &.{
+            .{ .offset = 0, .bytes = "Hi" },
         },
         .funcs = &.{
             .{
-                .name = "getGlobal",
-                .results = &.{.i32},
+                .name = "writeHi",
                 .body = &.{
-                    .{ .global_get = "g" },
-                },
-            },
-            .{
-                .name = "incGlobal",
-                .body = &.{
-                    .{ .global_get = "g" },
-                    .{ .i32_const = 1 },
-                    .i32_add,
-                    .{ .global_set = "g" },
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
                 },
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
+            .{ .name = "writeHi", .desc = .{ .func = "writeHi" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try std.fmt.format(file.writer(), "{}", .{module});
-    _ = try std.ChildProcess.exec(.{
+    const result = try std.ChildProcess.exec(.{
         .allocator = allocator,
         .argv = &.{ "wat2wasm", "temp.wat" },
         .cwd = "temp",
     });
+    if (result.stdout.len > 0) {
+        std.debug.print("\nstdout: {s}\n", .{result.stdout});
+    }
+    if (result.stderr.len > 0) {
+        std.debug.print("\nstderr: {s}\n", .{result.stderr});
+    }
 }
