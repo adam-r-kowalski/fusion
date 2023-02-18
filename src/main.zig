@@ -6,14 +6,23 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
     const module = fusion.wasm.Module{
+        .imports = &.{
+            .{
+                .module = "js",
+                .name = "log",
+                .desc = .{
+                    .func = .{ .name = "log", .params = &.{.i32} },
+                },
+            },
+        },
         .funcs = &.{
             .{
                 .name = "add",
                 .params = &.{
-                    .{ .name = "lhs", .type = .{ .num = .i32 } },
-                    .{ .name = "rhs", .type = .{ .num = .i32 } },
+                    .{ .name = "lhs", .type = .i32 },
+                    .{ .name = "rhs", .type = .i32 },
                 },
-                .results = &.{.{ .num = .i32 }},
+                .results = &.{.i32},
                 .body = &.{
                     .{ .local_get = "lhs" },
                     .{ .local_get = "rhs" },
@@ -21,18 +30,17 @@ pub fn main() !void {
                 },
             },
             .{
-                .name = "start",
-                .results = &.{.{ .num = .i32 }},
+                .name = "on_load",
                 .body = &.{
-                    .{ .i32_const = 5 },
                     .{ .i32_const = 10 },
+                    .{ .i32_const = 15 },
                     .{ .call = "add" },
+                    .{ .call = "log" },
                 },
             },
         },
         .exports = &.{
-            .{ .name = "add", .desc = .{ .func = "add" } },
-            .{ .name = "_start", .desc = .{ .func = "start" } },
+            .{ .name = "on_load", .desc = .{ .func = "on_load" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});

@@ -3,11 +3,12 @@ const Allocator = std.mem.Allocator;
 const str = []const u8;
 const Opts = std.fmt.FormatOptions;
 
-pub const Number = enum {
+pub const Type = enum {
     i32,
     i64,
     f32,
     f64,
+    v128,
 
     pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
         switch (self) {
@@ -15,17 +16,6 @@ pub const Number = enum {
             .i64 => try writer.writeAll("i64"),
             .f32 => try writer.writeAll("f32"),
             .f64 => try writer.writeAll("f64"),
-        }
-    }
-};
-
-pub const Value = union(enum) {
-    num: Number,
-    v128,
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        switch (self) {
-            .num => |num| try std.fmt.format(writer, "{}", .{num}),
             .v128 => try writer.writeAll("v128"),
         }
     }
@@ -38,7 +28,7 @@ pub const Limit = struct {
 
 pub const Param = struct {
     name: str,
-    type: Value,
+    type: Type,
 
     pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
         try std.fmt.format(writer, "(param ${s} {})", .{ self.name, self.type });
@@ -68,7 +58,7 @@ pub const Op = union(enum) {
 pub const Func = struct {
     name: str,
     params: []const Param = &.{},
-    results: []const Value = &.{},
+    results: []const Type = &.{},
     body: []const Op,
 };
 
@@ -78,8 +68,8 @@ pub const Import = struct {
     desc: union(enum) {
         func: struct {
             name: str,
-            params: []const Value = &.{},
-            results: []const Value = &.{},
+            params: []const Type = &.{},
+            results: []const Type = &.{},
         },
 
         pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
@@ -115,7 +105,7 @@ pub const Import = struct {
 pub const Global = struct {
     name: str,
     path: [2]str,
-    type: Number,
+    type: Type,
 };
 
 pub const Data = struct {
@@ -198,10 +188,10 @@ test "non exported function" {
             .{
                 .name = "add",
                 .params = &.{
-                    .{ .name = "lhs", .type = .{ .num = .i32 } },
-                    .{ .name = "rhs", .type = .{ .num = .i32 } },
+                    .{ .name = "lhs", .type = .i32 },
+                    .{ .name = "rhs", .type = .i32 },
                 },
-                .results = &.{.{ .num = .i32 }},
+                .results = &.{.i32},
                 .body = &.{
                     .{ .local_get = "lhs" },
                     .{ .local_get = "rhs" },
@@ -230,10 +220,10 @@ test "exported function" {
             .{
                 .name = "add",
                 .params = &.{
-                    .{ .name = "lhs", .type = .{ .num = .i32 } },
-                    .{ .name = "rhs", .type = .{ .num = .i32 } },
+                    .{ .name = "lhs", .type = .i32 },
+                    .{ .name = "rhs", .type = .i32 },
                 },
-                .results = &.{.{ .num = .i32 }},
+                .results = &.{.i32},
                 .body = &.{
                     .{ .local_get = "lhs" },
                     .{ .local_get = "rhs" },
@@ -267,10 +257,10 @@ test "exported function with new name" {
             .{
                 .name = "add",
                 .params = &.{
-                    .{ .name = "lhs", .type = .{ .num = .i32 } },
-                    .{ .name = "rhs", .type = .{ .num = .i32 } },
+                    .{ .name = "lhs", .type = .i32 },
+                    .{ .name = "rhs", .type = .i32 },
                 },
-                .results = &.{.{ .num = .i32 }},
+                .results = &.{.i32},
                 .body = &.{
                     .{ .local_get = "lhs" },
                     .{ .local_get = "rhs" },
@@ -302,14 +292,14 @@ test "function call" {
     const module = Module{ .funcs = &.{
         .{
             .name = "getAnswer",
-            .results = &.{.{ .num = .i32 }},
+            .results = &.{.i32},
             .body = &.{
                 .{ .i32_const = 42 },
             },
         },
         .{
             .name = "getAnswerPlus1",
-            .results = &.{.{ .num = .i32 }},
+            .results = &.{.i32},
             .body = &.{
                 .{ .call = "getAnswer" },
                 .{ .i32_const = 1 },
@@ -347,7 +337,7 @@ test "import function" {
                 .desc = .{
                     .func = .{
                         .name = "log",
-                        .params = &.{.{ .num = .i32 }},
+                        .params = &.{.i32},
                     },
                 },
             },
