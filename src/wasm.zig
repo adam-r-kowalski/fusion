@@ -69,11 +69,21 @@ pub const Data = struct {
 	bytes: []const u8,
 };
 
-pub const Export = union(enum) {
-	func: struct {
-		name: []const u8,
-		as: ?[]const u8 = null,
+pub const Export = struct {
+	name: []const u8,
+	desc: union(enum) {
+		func: []const u8,
+
+		pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+			switch (self) {
+				.func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
+			}
+		}
 	},
+
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+		try std.fmt.format(writer, "(export \"{s}\" {})", .{self.name, self.desc});
+    }
 };
 
 pub const Module = struct {
@@ -155,13 +165,7 @@ fn writeFuncs(writer: anytype, module: Module) !void {
 
 fn writeExports(writer: anytype, module: Module) !void {
     for (module.exports) |e| {
-		switch (e) {
-			.func => |func| {
-				const fmt = "\n\n    (export \"{s}\" (func ${s}))";
-				const name = if (func.as) |as| as else func.name;
-				try std.fmt.format(writer, fmt, .{ name, func.name });
-			}
-		}
+		try std.fmt.format(writer, "\n\n    {}", .{ e });
     }
 }
 
@@ -210,7 +214,7 @@ test "exported function" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "add" } },
+			.{ .name="add", .desc=.{.func = "add" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
@@ -244,7 +248,7 @@ test "exported function with new name" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "add", .as = "myAdd" } },
+			.{ .name="myAdd", .desc=.{.func = "add" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
@@ -284,7 +288,7 @@ test "function call" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "getAnswerPlus1" } },
+			.{ .name="getAnswerPlus1", .desc=.{.func = "getAnswerPlus1" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
@@ -321,7 +325,7 @@ test "import function" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "logIt" } },
+			.{ .name="logIt", .desc=.{.func = "logIt" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
@@ -365,8 +369,8 @@ test "global variables" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "getGlobal" } },
-			.{ .func = .{.name = "incGlobal" } },
+			.{ .name="getGlobal", .desc=.{.func = "getGlobal" } },
+			.{ .name="incGlobal", .desc=.{.func = "incGlobal" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
@@ -413,7 +417,7 @@ test "memory" {
             },
         },
 		.exports = &.{
-			.{ .func = .{.name = "writeHi" } },
+			.{ .name="writeHi", .desc=.{.func = "writeHi" } },
 		}
     };
 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
