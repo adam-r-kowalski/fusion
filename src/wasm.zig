@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 pub const Type = enum {
     i32,
@@ -69,12 +70,9 @@ pub const Module = struct {
     funcs: []const Func = &.{},
 };
 
-pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
-    var output = std.ArrayList(u8).init(allocator);
-    const writer = output.writer();
-    try writer.writeAll("(module");
-    var exports = std.ArrayList([]const u8).init(allocator);
-    defer exports.deinit();
+const Writer = std.ArrayList(u8).Writer;
+
+fn writeGlobals(writer: Writer, module: Module) !void {
     for (module.globals) |global| {
         const fmt = "\n\n    (global ${s} (import \"{s}\" \"{s}\") (mut {}))";
         try std.fmt.format(writer, fmt, .{
@@ -84,6 +82,9 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
             global.type,
         });
     }
+}
+
+fn writeImports(writer: Writer, module: Module) !void {
     for (module.imports) |import| {
         switch (import) {
             .func => |func| {
@@ -96,6 +97,10 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
             },
         }
     }
+}
+
+fn writeFuncs(allocator: Allocator, writer: Writer, module: Module) ![][]const u8 {
+    var exports = std.ArrayList([]const u8).init(allocator);
     for (module.funcs) |func| {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         for (func.params) |param| {
@@ -112,12 +117,24 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
             try exports.append(func.name);
         }
     }
-    if (exports.items.len > 0) {
-        try writer.writeAll("\n");
-    }
-    for (exports.items) |name| {
-        try std.fmt.format(writer, "\n    (export \"{s}\" (func ${s}))", .{ name, name });
-    }
+	return exports.toOwnedSlice();
+}
+
+fn writeExports(writer: Writer, exports: [][]const u8) !void {
+	for (exports) |name| {
+		try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ name, name });
+	}
+}
+
+pub fn wat(allocator: Allocator, module: Module) ![]u8 {
+    var output = std.ArrayList(u8).init(allocator);
+    const writer = output.writer();
+    try writer.writeAll("(module");
+	try writeGlobals(writer, module);
+	try writeImports(writer, module);
+	const exports = try writeFuncs(allocator, writer, module);
+    defer allocator.free(exports);
+	try writeExports(writer, exports);
     try writer.writeAll(")");
     return output.toOwnedSlice();
 }
@@ -301,6 +318,7 @@ test "global variables" {
         \\        (global.set $g))
         \\
         \\    (export "getGlobal" (func $getGlobal))
+		\\
         \\    (export "incGlobal" (func $incGlobal)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
