@@ -16,7 +16,10 @@ pub const Type = enum {
     }
 };
 
-pub const Param = struct { name: []const u8, type: Type };
+pub const Param = struct {
+    name: []const u8,
+    type: Type,
+};
 
 pub const Op = union(enum) {
     call: []const u8,
@@ -46,7 +49,7 @@ pub const Import = union(enum) {
     func: struct {
         path: [2][]const u8,
         name: []const u8,
-        params: []const Type,
+        params: []const Type = &.{},
     },
 };
 
@@ -64,7 +67,7 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
     for (module.imports) |import| {
         switch (import) {
             .func => |func| {
-                const fmt = "\n\n  (import \"{s}\" \"{s}\" (func ${s}";
+                const fmt = "\n\n    (import \"{s}\" \"{s}\" (func ${s}";
                 try std.fmt.format(writer, fmt, .{ func.path[0], func.path[1], func.name });
                 for (func.params) |param| {
                     try std.fmt.format(writer, " (param {})", .{param});
@@ -74,7 +77,7 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
         }
     }
     for (module.funcs) |func| {
-        try std.fmt.format(writer, "\n\n  (func ${s}", .{func.name});
+        try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         for (func.params) |param| {
             try std.fmt.format(writer, " (param ${s} ${})", .{ param.name, param.type });
         }
@@ -82,7 +85,7 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
             try std.fmt.format(writer, " (result {})", .{result});
         }
         for (func.ops) |op| {
-            try std.fmt.format(writer, "\n   {}", .{op});
+            try std.fmt.format(writer, "\n        {}", .{op});
         }
         try writer.writeAll(")");
         if (func.exported) {
@@ -93,7 +96,7 @@ pub fn wat(allocator: std.mem.Allocator, module: Module) ![]u8 {
         try writer.writeAll("\n");
     }
     for (exports.items) |name| {
-        try std.fmt.format(writer, "\n  (export \"{s}\" (func ${s}))", .{ name, name });
+        try std.fmt.format(writer, "\n    (export \"{s}\" (func ${s}))", .{ name, name });
     }
     try writer.writeAll(")");
     return output.toOwnedSlice();
@@ -120,10 +123,10 @@ test "generate wat for a non exported function" {
     const expected =
         \\(module
         \\
-        \\  (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
-        \\   (local.get $lhs)
-        \\   (local.get $rhs)
-        \\   i32.add))
+        \\    (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
+        \\        (local.get $lhs)
+        \\        (local.get $rhs)
+        \\        i32.add))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
@@ -150,12 +153,12 @@ test "generate wat for a exported function" {
     const expected =
         \\(module
         \\
-        \\  (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
-        \\   (local.get $lhs)
-        \\   (local.get $rhs)
-        \\   i32.add)
+        \\    (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
+        \\        (local.get $lhs)
+        \\        (local.get $rhs)
+        \\        i32.add)
         \\
-        \\  (export "add" (func $add)))
+        \\    (export "add" (func $add)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
@@ -188,15 +191,15 @@ test "generate wat for a function call" {
     const expected =
         \\(module
         \\
-        \\  (func $getAnswer (result i32)
-        \\   (i32.const 42))
+        \\    (func $getAnswer (result i32)
+        \\        (i32.const 42))
         \\
-        \\  (func $getAnswerPlus1 (result i32)
-        \\   (call $getAnswer)
-        \\   (i32.const 1)
-        \\   i32.add)
+        \\    (func $getAnswerPlus1 (result i32)
+        \\        (call $getAnswer)
+        \\        (i32.const 1)
+        \\        i32.add)
         \\
-        \\  (export "getAnswerPlus1" (func $getAnswerPlus1)))
+        \\    (export "getAnswerPlus1" (func $getAnswerPlus1)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
@@ -223,13 +226,13 @@ test "generate wat for a import" {
     const expected =
         \\(module
         \\
-        \\  (import "console" "log" (func $log (param i32)))
+        \\    (import "console" "log" (func $log (param i32)))
         \\
-        \\  (func $logIt
-        \\   (i32.const 13)
-        \\   (call $log))
+        \\    (func $logIt
+        \\        (i32.const 13)
+        \\        (call $log))
         \\
-        \\  (export "logIt" (func $logIt)))
+        \\    (export "logIt" (func $logIt)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
