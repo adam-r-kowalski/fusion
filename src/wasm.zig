@@ -47,7 +47,6 @@ pub const Func = struct {
     params: []const Param = &.{},
     result: ?Type = null,
     ops: []const Op,
-    exported: bool = false,
 };
 
 pub const Import = union(enum) {
@@ -70,11 +69,19 @@ pub const Data = struct {
 	bytes: []const u8,
 };
 
+pub const Export = union(enum) {
+	func: struct {
+		name: []const u8,
+		as: ?[]const u8 = null,
+	},
+};
+
 pub const Module = struct {
     globals: []const Global = &.{},
     imports: []const Import = &.{},
 	data: []const Data = &.{},
     funcs: []const Func = &.{},
+	exports: []const Export = &.{},
 };
 
 const Writer = std.ArrayList(u8).Writer;
@@ -121,8 +128,7 @@ fn writeData(writer: Writer, module: Module) !void {
 	}
 }
 
-fn writeFuncs(allocator: Allocator, writer: Writer, module: Module) ![][]const u8 {
-    var exports = std.ArrayList([]const u8).init(allocator);
+fn writeFuncs(writer: Writer, module: Module) !void {
     for (module.funcs) |func| {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         for (func.params) |param| {
@@ -135,16 +141,16 @@ fn writeFuncs(allocator: Allocator, writer: Writer, module: Module) ![][]const u
             try std.fmt.format(writer, "\n        {}", .{op});
         }
         try writer.writeAll(")");
-        if (func.exported) {
-            try exports.append(func.name);
-        }
     }
-    return exports.toOwnedSlice();
 }
 
-fn writeExports(writer: Writer, exports: [][]const u8) !void {
-    for (exports) |name| {
-        try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ name, name });
+fn writeExports(writer: Writer, module: Module) !void {
+    for (module.exports) |e| {
+		switch (e) {
+			.func => |func| {
+				try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ func.name, func.name });
+			}
+		}
     }
 }
 
@@ -155,9 +161,8 @@ pub fn wat(allocator: Allocator, module: Module) ![]u8 {
     try writeGlobals(writer, module);
     try writeImports(writer, module);
 	try writeData(writer, module);
-    const exports = try writeFuncs(allocator, writer, module);
-    defer allocator.free(exports);
-    try writeExports(writer, exports);
+    try writeFuncs(writer, module);
+    try writeExports(writer, module);
     try writer.writeAll(")");
     return output.toOwnedSlice();
 }
@@ -204,9 +209,11 @@ test "exported function" {
                     .{ .local_get = "rhs" },
                     .i32_add,
                 },
-                .exported = true,
             },
         },
+		.exports = &.{
+			.{ .func = .{.name = "add" } },
+		}
     };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
@@ -242,9 +249,11 @@ test "function call" {
                     .{ .i32_const = 1 },
                     .i32_add,
                 },
-                .exported = true,
             },
         },
+		.exports = &.{
+			.{ .func = .{.name = "getAnswerPlus1" } },
+		}
     };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
@@ -277,9 +286,11 @@ test "import function" {
                     .{ .i32_const = 13 },
                     .{ .call = "log" },
                 },
-                .exported = true,
             },
         },
+		.exports = &.{
+			.{ .func = .{.name = "logIt" } },
+		}
     };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
@@ -310,7 +321,6 @@ test "global variables" {
                 .ops = &.{
                     .{ .global_get = "g" },
                 },
-                .exported = true,
             },
             .{
                 .name = "incGlobal",
@@ -320,9 +330,12 @@ test "global variables" {
                     .i32_add,
                     .{ .global_set = "g" },
                 },
-                .exported = true,
             },
         },
+		.exports = &.{
+			.{ .func = .{.name = "getGlobal" } },
+			.{ .func = .{.name = "incGlobal" } },
+		}
     };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
@@ -365,9 +378,11 @@ test "memory" {
                     .{ .i32_const = 2 },
                     .{ .call = "log" },
                 },
-                .exported = true,
             },
         },
+		.exports = &.{
+			.{ .func = .{.name = "writeHi" } },
+		}
     };
     const actual = try wat(allocator, module);
     defer allocator.free(actual);
