@@ -2,8 +2,6 @@ const std = @import("std");
 const fusion = @import("fusion");
 
 pub fn main() !void {
-	var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-	const allocator = arena.allocator();
 	const module = fusion.wasm.Module{
         .funcs = &.{
             .{
@@ -18,6 +16,5 @@ pub fn main() !void {
             },
         },
 	};
-	const wat = try fusion.wasm.wat(allocator, module);
-	std.debug.print("{s}\n", .{wat});
+	std.debug.print("{}\n", .{module});
 }

@@ -82,11 +82,20 @@ pub const Module = struct {
 	data: []const Data = &.{},
     funcs: []const Func = &.{},
 	exports: []const Export = &.{},
+
+
+    pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+		try writer.writeAll("(module");
+		try writeGlobals(writer, self);
+		try writeImports(writer, self);
+		try writeData(writer, self);
+		try writeFuncs(writer, self);
+		try writeExports(writer, self);
+		try writer.writeAll(")");
+    }
 };
 
-const Writer = std.ArrayList(u8).Writer;
-
-fn writeGlobals(writer: Writer, module: Module) !void {
+fn writeGlobals(writer: anytype, module: Module) !void {
     for (module.globals) |global| {
         const fmt = "\n\n    (global ${s} (import \"{s}\" \"{s}\") (mut {}))";
         try std.fmt.format(writer, fmt, .{
@@ -98,7 +107,7 @@ fn writeGlobals(writer: Writer, module: Module) !void {
     }
 }
 
-fn writeImports(writer: Writer, module: Module) !void {
+fn writeImports(writer: anytype, module: Module) !void {
     for (module.imports) |import| {
         switch (import) {
             .func => |func| {
@@ -121,14 +130,14 @@ fn writeImports(writer: Writer, module: Module) !void {
     }
 }
 
-fn writeData(writer: Writer, module: Module) !void {
+fn writeData(writer: anytype, module: Module) !void {
 	for (module.data) |data| {
 		const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
 		try std.fmt.format(writer, fmt, .{ data.offset, data.bytes });
 	}
 }
 
-fn writeFuncs(writer: Writer, module: Module) !void {
+fn writeFuncs(writer: anytype, module: Module) !void {
     for (module.funcs) |func| {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         for (func.params) |param| {
@@ -144,7 +153,7 @@ fn writeFuncs(writer: Writer, module: Module) !void {
     }
 }
 
-fn writeExports(writer: Writer, module: Module) !void {
+fn writeExports(writer: anytype, module: Module) !void {
     for (module.exports) |e| {
 		switch (e) {
 			.func => |func| {
@@ -152,19 +161,6 @@ fn writeExports(writer: Writer, module: Module) !void {
 			}
 		}
     }
-}
-
-pub fn wat(allocator: Allocator, module: Module) ![]u8 {
-    var output = std.ArrayList(u8).init(allocator);
-    const writer = output.writer();
-    try writer.writeAll("(module");
-    try writeGlobals(writer, module);
-    try writeImports(writer, module);
-	try writeData(writer, module);
-    try writeFuncs(writer, module);
-    try writeExports(writer, module);
-    try writer.writeAll(")");
-    return output.toOwnedSlice();
 }
 
 test "non exported function" {
@@ -183,7 +179,7 @@ test "non exported function" {
             },
         },
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -215,7 +211,7 @@ test "exported function" {
 			.{ .func = .{.name = "add" } },
 		}
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -255,7 +251,7 @@ test "function call" {
 			.{ .func = .{.name = "getAnswerPlus1" } },
 		}
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -292,7 +288,7 @@ test "import function" {
 			.{ .func = .{.name = "logIt" } },
 		}
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -337,7 +333,7 @@ test "global variables" {
 			.{ .func = .{.name = "incGlobal" } },
 		}
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -384,7 +380,7 @@ test "memory" {
 			.{ .func = .{.name = "writeHi" } },
 		}
     };
-    const actual = try wat(allocator, module);
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
     defer allocator.free(actual);
     const expected =
         \\(module
