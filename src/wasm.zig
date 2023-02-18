@@ -41,7 +41,7 @@ pub const Param = struct {
     type: Value,
 
     pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-		try std.fmt.format(writer, "(param ${s} {})", .{self.name, self.type});
+        try std.fmt.format(writer, "(param ${s} {})", .{ self.name, self.type });
     }
 };
 
@@ -72,10 +72,45 @@ pub const Func = struct {
     body: []const Op,
 };
 
-pub const Import = struct { module: str, name: str, desc: union(enum) { func: struct {
+pub const Import = struct {
+    module: str,
     name: str,
-    params: []const Number = &.{},
-} } };
+    desc: union(enum) {
+        func: struct {
+            name: str,
+            params: []const Value = &.{},
+            results: []const Value = &.{},
+        },
+
+        pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
+            switch (self) {
+                .func => |func| {
+                    try std.fmt.format(writer, "(func ${s}", .{func.name});
+                    if (func.params.len > 0) {
+                        try writer.writeAll(" (param");
+                        for (func.params) |param| {
+                            try std.fmt.format(writer, " {}", .{param});
+                        }
+                        try writer.writeAll(")");
+                    }
+                    if (func.results.len > 0) {
+                        try writer.writeAll(" (result");
+                        for (func.results) |result| {
+                            try std.fmt.format(writer, " {}", .{result});
+                        }
+                        try writer.writeAll(")");
+                    }
+                    try writer.writeAll(")");
+                },
+            }
+        }
+    },
+
+    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
+        const fmt = "(import \"{s}\" \"{s}\" {})";
+        try std.fmt.format(writer, fmt, .{ self.module, self.name, self.desc });
+    }
+};
 
 pub const Global = struct {
     name: str,
@@ -106,14 +141,14 @@ pub const Export = struct {
 };
 
 pub const Module = struct {
-    // imports: []const Import = &.{},
+    imports: []const Import = &.{},
     // data: []const Data = &.{},
     funcs: []const Func = &.{},
     exports: []const Export = &.{},
 
     pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
         try writer.writeAll("(module");
-        // try writeImports(writer, self);
+        try writeImports(writer, self);
         // try writeData(writer, self);
         try writeFuncs(writer, self);
         try writeExports(writer, self);
@@ -123,24 +158,7 @@ pub const Module = struct {
 
 fn writeImports(writer: anytype, module: Module) !void {
     for (module.imports) |import| {
-        switch (import) {
-            .func => |func| {
-                const fmt = "\n\n    (import \"{s}\" \"{s}\" (func ${s}";
-                try std.fmt.format(writer, fmt, .{ func.path[0], func.path[1], func.name });
-                if (func.params.len > 0) {
-                    try writer.writeAll(" (param");
-                    for (func.params) |param| {
-                        try std.fmt.format(writer, " {}", .{param});
-                    }
-                    try writer.writeAll(")");
-                }
-                try writer.writeAll("))");
-            },
-            .memory => |memory| {
-                const fmt = "\n\n    (import \"{s}\" \"{s}\" (memory {}))";
-                try std.fmt.format(writer, fmt, .{ memory.path[0], memory.path[1], memory.size });
-            },
-        }
+        try std.fmt.format(writer, "\n\n    {}", .{import});
     }
 }
 
@@ -155,7 +173,7 @@ fn writeFuncs(writer: anytype, module: Module) !void {
     for (module.funcs) |func| {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         for (func.params) |param| {
-            try std.fmt.format(writer, " {}", .{ param });
+            try std.fmt.format(writer, " {}", .{param});
         }
         for (func.results) |result| {
             try std.fmt.format(writer, " (result {})", .{result});
@@ -241,118 +259,127 @@ test "exported function" {
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
-//
-// test "exported function with new name" {
-//     const allocator = std.testing.allocator;
-//     const module = Module{
-//         .funcs = &.{
-//             .{
-//                 .name = "add",
-//                 .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
-//                 .result = .i32,
-//                 .ops = &.{
-//                     .{ .local_get = "lhs" },
-//                     .{ .local_get = "rhs" },
-//                     .i32_add,
-//                 },
-//             },
-//         },
-// 		.exports = &.{
-// 			.{ .name="myAdd", .desc=.{.func = "add" } },
-// 		}
-//     };
-// 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
-//         \\        (local.get $lhs)
-//         \\        (local.get $rhs)
-//         \\        i32.add)
-//         \\
-//         \\    (export "myAdd" (func $add)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "function call" {
-//     const allocator = std.testing.allocator;
-//     const module = Module{
-//         .funcs = &.{
-//             .{
-//                 .name = "getAnswer",
-//                 .result = .i32,
-//                 .ops = &.{
-//                     .{ .i32_const = 42 },
-//                 },
-//             },
-//             .{
-//                 .name = "getAnswerPlus1",
-//                 .result = .i32,
-//                 .ops = &.{
-//                     .{ .call = "getAnswer" },
-//                     .{ .i32_const = 1 },
-//                     .i32_add,
-//                 },
-//             },
-//         },
-// 		.exports = &.{
-// 			.{ .name="getAnswerPlus1", .desc=.{.func = "getAnswerPlus1" } },
-// 		}
-//     };
-// 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (func $getAnswer (result i32)
-//         \\        (i32.const 42))
-//         \\
-//         \\    (func $getAnswerPlus1 (result i32)
-//         \\        (call $getAnswer)
-//         \\        (i32.const 1)
-//         \\        i32.add)
-//         \\
-//         \\    (export "getAnswerPlus1" (func $getAnswerPlus1)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "import function" {
-//     const allocator = std.testing.allocator;
-//     const module = Module{
-//         .imports = &.{
-//             .{ .func = .{ .path = .{ "console", "log" }, .name = "log", .params = &.{.i32} } },
-//         },
-//         .funcs = &.{
-//             .{
-//                 .name = "logIt",
-//                 .ops = &.{
-//                     .{ .i32_const = 13 },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-// 		.exports = &.{
-// 			.{ .name="logIt", .desc=.{.func = "logIt" } },
-// 		}
-//     };
-// 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $logIt
-//         \\        (i32.const 13)
-//         \\        (call $log))
-//         \\
-//         \\    (export "logIt" (func $logIt)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
+
+test "exported function with new name" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .funcs = &.{
+            .{
+                .name = "add",
+                .params = &.{
+                    .{ .name = "lhs", .type = .{ .num = .i32 } },
+                    .{ .name = "rhs", .type = .{ .num = .i32 } },
+                },
+                .results = &.{.{ .num = .i32 }},
+                .body = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "myAdd", .desc = .{ .func = "add" } },
+        },
+    };
+    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $add (param $lhs i32) (param $rhs i32) (result i32)
+        \\        (local.get $lhs)
+        \\        (local.get $rhs)
+        \\        i32.add)
+        \\
+        \\    (export "myAdd" (func $add)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "function call" {
+    const allocator = std.testing.allocator;
+    const module = Module{ .funcs = &.{
+        .{
+            .name = "getAnswer",
+            .results = &.{.{ .num = .i32 }},
+            .body = &.{
+                .{ .i32_const = 42 },
+            },
+        },
+        .{
+            .name = "getAnswerPlus1",
+            .results = &.{.{ .num = .i32 }},
+            .body = &.{
+                .{ .call = "getAnswer" },
+                .{ .i32_const = 1 },
+                .i32_add,
+            },
+        },
+    }, .exports = &.{
+        .{ .name = "getAnswerPlus1", .desc = .{ .func = "getAnswerPlus1" } },
+    } };
+    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $getAnswer (result i32)
+        \\        (i32.const 42))
+        \\
+        \\    (func $getAnswerPlus1 (result i32)
+        \\        (call $getAnswer)
+        \\        (i32.const 1)
+        \\        i32.add)
+        \\
+        \\    (export "getAnswerPlus1" (func $getAnswerPlus1)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "import function" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .desc = .{
+                    .func = .{
+                        .name = "log",
+                        .params = &.{.{ .num = .i32 }},
+                    },
+                },
+            },
+        },
+        .funcs = &.{
+            .{
+                .name = "logIt",
+                .body = &.{
+                    .{ .i32_const = 13 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "logIt", .desc = .{ .func = "logIt" } },
+        },
+    };
+    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $logIt
+        \\        (i32.const 13)
+        \\        (call $log))
+        \\
+        \\    (export "logIt" (func $logIt)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
 //
 // test "global variables" {
 //     const allocator = std.testing.allocator;

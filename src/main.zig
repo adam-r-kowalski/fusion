@@ -31,6 +31,7 @@ pub fn main() !void {
             },
         },
         .exports = &.{
+            .{ .name = "add", .desc = .{ .func = "add" } },
             .{ .name = "_start", .desc = .{ .func = "start" } },
         },
     };
