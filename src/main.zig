@@ -2,6 +2,9 @@ const std = @import("std");
 const fusion = @import("fusion");
 
 pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
     const module = fusion.wasm.Module{
         .funcs = &.{
             .{
@@ -31,7 +34,11 @@ pub fn main() !void {
             .{ .name = "_start", .desc = .{ .func = "start" } },
         },
     };
-	const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
-	const wat = try std.fmt.allocPrint(std.heap.page_allocator, "{}", .{module});
-	try file.writeAll(wat);
+    const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
+    try std.fmt.format(file.writer(), "{}", .{module});
+    _ = try std.ChildProcess.exec(.{
+        .allocator = allocator,
+        .argv = &.{ "wat2wasm", "temp.wat" },
+        .cwd = "temp",
+    });
 }
