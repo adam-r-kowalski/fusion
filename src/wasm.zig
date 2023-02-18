@@ -157,7 +157,9 @@ fn writeExports(writer: anytype, module: Module) !void {
     for (module.exports) |e| {
 		switch (e) {
 			.func => |func| {
-				try std.fmt.format(writer, "\n\n    (export \"{s}\" (func ${s}))", .{ func.name, func.name });
+				const fmt = "\n\n    (export \"{s}\" (func ${s}))";
+				const name = if (func.as) |as| as else func.name;
+				try std.fmt.format(writer, fmt, .{ name, func.name });
 			}
 		}
     }
@@ -222,6 +224,40 @@ test "exported function" {
         \\        i32.add)
         \\
         \\    (export "add" (func $add)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "exported function with new name" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .funcs = &.{
+            .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .result = .i32,
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
+		.exports = &.{
+			.{ .func = .{.name = "add", .as = "myAdd" } },
+		}
+    };
+	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $add (param $lhs $i32) (param $rhs $i32) (result i32)
+        \\        (local.get $lhs)
+        \\        (local.get $rhs)
+        \\        i32.add)
+        \\
+        \\    (export "myAdd" (func $add)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
