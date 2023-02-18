@@ -9,38 +9,37 @@ pub fn main() !void {
         .imports = &.{
             .{
                 .module = "js",
-                .name = "log",
+                .name = "g",
                 .desc = .{
-                    .func = .{ .name = "log", .params = &.{.i32} },
+                    .global = .{
+                        .name = "g",
+                        .type = .i32,
+                        .mutable = true,
+                    },
                 },
             },
         },
         .funcs = &.{
             .{
-                .name = "add",
-                .params = &.{
-                    .{ .name = "lhs", .type = .i32 },
-                    .{ .name = "rhs", .type = .i32 },
-                },
+                .name = "getGlobal",
                 .results = &.{.i32},
                 .body = &.{
-                    .{ .local_get = "lhs" },
-                    .{ .local_get = "rhs" },
-                    .i32_add,
+                    .{ .global_get = "g" },
                 },
             },
             .{
-                .name = "on_load",
+                .name = "incGlobal",
                 .body = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 15 },
-                    .{ .call = "add" },
-                    .{ .call = "log" },
+                    .{ .global_get = "g" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                    .{ .global_set = "g" },
                 },
             },
         },
         .exports = &.{
-            .{ .name = "on_load", .desc = .{ .func = "on_load" } },
+            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
+            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});

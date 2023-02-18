@@ -60,6 +60,20 @@ pub const Func = struct {
     params: []const Param = &.{},
     results: []const Type = &.{},
     body: []const Op,
+
+    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
+        try std.fmt.format(writer, "(func ${s}", .{self.name});
+        for (self.params) |param| {
+            try std.fmt.format(writer, " {}", .{param});
+        }
+        for (self.results) |result| {
+            try std.fmt.format(writer, " (result {})", .{result});
+        }
+        for (self.body) |op| {
+            try std.fmt.format(writer, "\n        {}", .{op});
+        }
+        try writer.writeAll(")");
+    }
 };
 
 pub const Import = struct {
@@ -70,6 +84,11 @@ pub const Import = struct {
             name: str,
             params: []const Type = &.{},
             results: []const Type = &.{},
+        },
+        global: struct {
+            name: str,
+            type: Type,
+            mutable: bool = false,
         },
 
         pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
@@ -92,6 +111,15 @@ pub const Import = struct {
                     }
                     try writer.writeAll(")");
                 },
+                .global => |global| {
+                    try std.fmt.format(writer, "(global ${s}", .{global.name});
+                    if (global.mutable) {
+                        try std.fmt.format(writer, " (mut {})", .{global.type});
+                    } else {
+                        try std.fmt.format(writer, " {}", .{global.type});
+                    }
+                    try writer.writeAll(")");
+                },
             }
         }
     },
@@ -104,8 +132,36 @@ pub const Import = struct {
 
 pub const Global = struct {
     name: str,
-    path: [2]str,
     type: Type,
+    mutable: bool = false,
+    desc: union(enum) {
+        import: struct {
+            module: str,
+            name: str,
+        },
+    },
+
+    const Self = @This();
+
+    fn writeType(self: Self, writer: anytype) !void {
+        if (self.mutable) {
+            try std.fmt.format(writer, " (mut {})", .{self.type});
+        } else {
+            try std.fmt.format(writer, " {}", .{self.type});
+        }
+    }
+
+    pub fn format(self: Self, comptime _: str, _: Opts, writer: anytype) !void {
+        try std.fmt.format(writer, "(global ${s}", .{self.name});
+        switch (self.desc) {
+            .import => |import| {
+                const fmt = " (import \"{s}\" \"{s}\")";
+                try std.fmt.format(writer, fmt, .{ import.module, import.name });
+                try self.writeType(writer);
+                try writer.writeAll(")");
+            },
+        }
+    }
 };
 
 pub const Data = struct {
@@ -132,52 +188,34 @@ pub const Export = struct {
 
 pub const Module = struct {
     imports: []const Import = &.{},
+    globals: []const Global = &.{},
     // data: []const Data = &.{},
     funcs: []const Func = &.{},
     exports: []const Export = &.{},
 
     pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
         try writer.writeAll("(module");
-        try writeImports(writer, self);
+        for (self.imports) |import| {
+            try std.fmt.format(writer, "\n\n    {}", .{import});
+        }
+        for (self.globals) |global| {
+            try std.fmt.format(writer, "\n\n    {}", .{global});
+        }
         // try writeData(writer, self);
-        try writeFuncs(writer, self);
-        try writeExports(writer, self);
+        for (self.funcs) |func| {
+            try std.fmt.format(writer, "\n\n    {}", .{func});
+        }
+        for (self.exports) |e| {
+            try std.fmt.format(writer, "\n\n    {}", .{e});
+        }
         try writer.writeAll(")");
     }
 };
-
-fn writeImports(writer: anytype, module: Module) !void {
-    for (module.imports) |import| {
-        try std.fmt.format(writer, "\n\n    {}", .{import});
-    }
-}
 
 fn writeData(writer: anytype, module: Module) !void {
     for (module.data) |data| {
         const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
         try std.fmt.format(writer, fmt, .{ data.offset, data.bytes });
-    }
-}
-
-fn writeFuncs(writer: anytype, module: Module) !void {
-    for (module.funcs) |func| {
-        try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
-        for (func.params) |param| {
-            try std.fmt.format(writer, " {}", .{param});
-        }
-        for (func.results) |result| {
-            try std.fmt.format(writer, " (result {})", .{result});
-        }
-        for (func.body) |op| {
-            try std.fmt.format(writer, "\n        {}", .{op});
-        }
-        try writer.writeAll(")");
-    }
-}
-
-fn writeExports(writer: anytype, module: Module) !void {
-    for (module.exports) |e| {
-        try std.fmt.format(writer, "\n\n    {}", .{e});
     }
 }
 
@@ -370,58 +408,69 @@ test "import function" {
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
-//
-// test "global variables" {
-//     const allocator = std.testing.allocator;
-//     const module = Module{
-//         .globals = &.{
-//             .{ .name = "g", .path = .{ "js", "global" }, .type = .i32 },
-//         },
-//         .funcs = &.{
-//             .{
-//                 .name = "getGlobal",
-//                 .result = .i32,
-//                 .ops = &.{
-//                     .{ .global_get = "g" },
-//                 },
-//             },
-//             .{
-//                 .name = "incGlobal",
-//                 .ops = &.{
-//                     .{ .global_get = "g" },
-//                     .{ .i32_const = 1 },
-//                     .i32_add,
-//                     .{ .global_set = "g" },
-//                 },
-//             },
-//         },
-// 		.exports = &.{
-// 			.{ .name="getGlobal", .desc=.{.func = "getGlobal" } },
-// 			.{ .name="incGlobal", .desc=.{.func = "incGlobal" } },
-// 		}
-//     };
-// 	const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (global $g (import "js" "global") (mut i32))
-//         \\
-//         \\    (func $getGlobal (result i32)
-//         \\        (global.get $g))
-//         \\
-//         \\    (func $incGlobal
-//         \\        (global.get $g)
-//         \\        (i32.const 1)
-//         \\        i32.add
-//         \\        (global.set $g))
-//         \\
-//         \\    (export "getGlobal" (func $getGlobal))
-//         \\
-//         \\    (export "incGlobal" (func $incGlobal)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
+
+test "import global variable" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "js",
+                .name = "global",
+                .desc = .{
+                    .global = .{
+                        .name = "g",
+                        .type = .i32,
+                        .mutable = true,
+                    },
+                },
+            },
+        },
+        .funcs = &.{
+            .{
+                .name = "getGlobal",
+                .results = &.{.i32},
+                .body = &.{
+                    .{ .global_get = "g" },
+                },
+            },
+            .{
+                .name = "incGlobal",
+                .body = &.{
+                    .{ .global_get = "g" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                    .{ .global_set = "g" },
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
+            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
+        },
+    };
+    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "js" "global" (global $g (mut i32)))
+        \\
+        \\    (func $getGlobal (result i32)
+        \\        (global.get $g))
+        \\
+        \\    (func $incGlobal
+        \\        (global.get $g)
+        \\        (i32.const 1)
+        \\        i32.add
+        \\        (global.set $g))
+        \\
+        \\    (export "getGlobal" (func $getGlobal))
+        \\
+        \\    (export "incGlobal" (func $incGlobal)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
 //
 // test "memory" {
 //     const allocator = std.testing.allocator;
