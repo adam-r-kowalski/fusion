@@ -1,7 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const str = []const u8;
-const Opts = std.fmt.FormatOptions;
 
 pub const Type = enum {
     i32,
@@ -9,31 +8,58 @@ pub const Type = enum {
     f32,
     f64,
     v128,
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        switch (self) {
-            .i32 => try writer.writeAll("i32"),
-            .i64 => try writer.writeAll("i64"),
-            .f32 => try writer.writeAll("f32"),
-            .f64 => try writer.writeAll("f64"),
-            .v128 => try writer.writeAll("v128"),
-        }
-    }
 };
+
+const Types = []const Type;
 
 pub const Limit = struct {
     min: u32,
     max: ?u32 = null,
 };
 
+pub const Import = struct {
+    module: str,
+    name: str,
+    kind: union(enum) {
+        func: struct {
+            name: str,
+            params: Types = &.{},
+            results: Types = &.{},
+        },
+        global: struct {
+            name: str,
+            type: Type,
+            mutable: bool = false,
+        },
+        memory: Limit,
+    },
+};
+
+const Imports = []const Import;
+
+pub const Global = struct {
+    name: str,
+    value: union(enum) {
+        i32: i32,
+    },
+    mutable: bool = false,
+};
+
+const Globals = []const Global;
+
+pub const Data = struct {
+    offset: u32,
+    bytes: str,
+};
+
+const Datas = []const Data;
+
 pub const Param = struct {
     name: str,
     type: Type,
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        try std.fmt.format(writer, "(param ${s} {})", .{ self.name, self.type });
-    }
 };
+
+const Params = []const Param;
 
 pub const Op = union(enum) {
     call: str,
@@ -42,9 +68,138 @@ pub const Op = union(enum) {
     global_set: str,
     i32_add,
     i32_const: i32,
+};
 
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        switch (self) {
+const Body = []const Op;
+
+pub const Func = struct {
+    name: str,
+    params: Params = &.{},
+    results: Types = &.{},
+    body: Body,
+};
+
+const Funcs = []const Func;
+
+pub const Export = struct {
+    name: str,
+    kind: union(enum) {
+        func: str,
+        global: str,
+    },
+};
+
+const Exports = []const Export;
+
+pub const Module = struct {
+    imports: Imports = &.{},
+    globals: Globals = &.{},
+    datas: Datas = &.{},
+    funcs: Funcs = &.{},
+    exports: Exports = &.{},
+};
+
+fn watType(t: Type, writer: anytype) !void {
+    switch (t) {
+        .i32 => try writer.writeAll("i32"),
+        .i64 => try writer.writeAll("i64"),
+        .f32 => try writer.writeAll("f32"),
+        .f64 => try writer.writeAll("f64"),
+        .v128 => try writer.writeAll("v128"),
+    }
+}
+
+fn watImports(imports: Imports, writer: anytype) !void {
+    for (imports) |import| {
+        const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
+        try std.fmt.format(writer, fmt, .{ import.module, import.name });
+        switch (import.kind) {
+            .func => |func| {
+                try std.fmt.format(writer, "(func ${s}", .{func.name});
+                if (func.params.len > 0) {
+                    try writer.writeAll(" (param");
+                    for (func.params) |param| {
+                        try writer.writeAll(" ");
+                        try watType(param, writer);
+                    }
+                    try writer.writeAll(")");
+                }
+                if (func.results.len > 0) {
+                    try writer.writeAll(" (result");
+                    for (func.results) |result| {
+                        try writer.writeAll(" ");
+                        try watType(result, writer);
+                    }
+                    try writer.writeAll(")");
+                }
+                try writer.writeAll(")");
+            },
+            .global => |global| {
+                try std.fmt.format(writer, "(global ${s}", .{global.name});
+                if (global.mutable) {
+                    try writer.writeAll(" (mut ");
+                    try watType(global.type, writer);
+                    try writer.writeAll(")");
+                } else {
+                    try writer.writeAll(" ");
+                    try watType(global.type, writer);
+                }
+                try writer.writeAll(")");
+            },
+            .memory => |limit| {
+                try std.fmt.format(writer, "(memory {})", .{limit.min});
+            },
+        }
+        try writer.writeAll(")");
+    }
+}
+
+fn watGlobalType(global: Global, writer: anytype) !void {
+    if (global.mutable) try writer.writeAll("(mut ");
+    switch (global.value) {
+        .i32 => try writer.writeAll("i32"),
+    }
+    if (global.mutable) try writer.writeAll(")");
+}
+
+fn watGlobals(globals: Globals, writer: anytype) !void {
+    for (globals) |global| {
+        try std.fmt.format(writer, "\n\n    (global ${s} ", .{global.name});
+        try watGlobalType(global, writer);
+        switch (global.value) {
+            .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
+        }
+        try writer.writeAll(")");
+    }
+}
+
+fn watDatas(datas: Datas, writer: anytype) !void {
+    for (datas) |data| {
+        const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
+        try std.fmt.format(writer, fmt, .{ data.offset, data.bytes });
+    }
+}
+
+fn watFuncParams(params: Params, writer: anytype) !void {
+    for (params) |param| {
+        try std.fmt.format(writer, " (param ${s} ", .{param.name});
+        try watType(param.type, writer);
+        try writer.writeAll(")");
+    }
+}
+
+fn watFuncResults(results: Types, writer: anytype) !void {
+    for (results) |result| {
+        try writer.writeAll(" (result ");
+        try watType(result, writer);
+        try writer.writeAll(")");
+    }
+}
+
+fn watFuncBody(body: Body, writer: anytype) !void {
+    for (body) |op| {
+        try writer.writeAll("\n        ");
+        switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
             .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
             .global_get => |value| try std.fmt.format(writer, "(global.get ${s})", .{value}),
@@ -53,168 +208,44 @@ pub const Op = union(enum) {
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
         }
     }
-};
+}
 
-pub const Func = struct {
-    name: str,
-    params: []const Param = &.{},
-    results: []const Type = &.{},
-    body: []const Op,
+fn watFuncs(funcs: Funcs, writer: anytype) !void {
+    for (funcs) |func| {
+        try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
+        try watFuncParams(func.params, writer);
+        try watFuncResults(func.results, writer);
+        try watFuncBody(func.body, writer);
+        try writer.writeAll(")");
+    }
+}
 
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        try std.fmt.format(writer, "(func ${s}", .{self.name});
-        for (self.params) |param| {
-            try std.fmt.format(writer, " {}", .{param});
-        }
-        for (self.results) |result| {
-            try std.fmt.format(writer, " (result {})", .{result});
-        }
-        for (self.body) |op| {
-            try std.fmt.format(writer, "\n        {}", .{op});
+fn watExports(exports: Exports, writer: anytype) !void {
+    for (exports) |e| {
+        try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e.name});
+        switch (e.kind) {
+            .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
+            .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
         }
         try writer.writeAll(")");
     }
-};
+}
 
-pub const Import = struct {
-    module: str,
-    name: str,
-    desc: union(enum) {
-        func: struct {
-            name: str,
-            params: []const Type = &.{},
-            results: []const Type = &.{},
-        },
-        global: struct {
-            name: str,
-            type: Type,
-            mutable: bool = false,
-        },
-        memory: Limit,
+pub fn wat(module: Module, writer: anytype) !void {
+    try writer.writeAll("(module");
+    try watImports(module.imports, writer);
+    try watGlobals(module.globals, writer);
+    try watDatas(module.datas, writer);
+    try watFuncs(module.funcs, writer);
+    try watExports(module.exports, writer);
+    try writer.writeAll(")");
+}
 
-        pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-            switch (self) {
-                .func => |func| {
-                    try std.fmt.format(writer, "(func ${s}", .{func.name});
-                    if (func.params.len > 0) {
-                        try writer.writeAll(" (param");
-                        for (func.params) |param| {
-                            try std.fmt.format(writer, " {}", .{param});
-                        }
-                        try writer.writeAll(")");
-                    }
-                    if (func.results.len > 0) {
-                        try writer.writeAll(" (result");
-                        for (func.results) |result| {
-                            try std.fmt.format(writer, " {}", .{result});
-                        }
-                        try writer.writeAll(")");
-                    }
-                    try writer.writeAll(")");
-                },
-                .global => |global| {
-                    try std.fmt.format(writer, "(global ${s}", .{global.name});
-                    if (global.mutable) {
-                        try std.fmt.format(writer, " (mut {})", .{global.type});
-                    } else {
-                        try std.fmt.format(writer, " {}", .{global.type});
-                    }
-                    try writer.writeAll(")");
-                },
-                .memory => |limit| {
-                    try std.fmt.format(writer, "(memory {})", .{limit.min});
-                },
-            }
-        }
-    },
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        const fmt = "(import \"{s}\" \"{s}\" {})";
-        try std.fmt.format(writer, fmt, .{ self.module, self.name, self.desc });
-    }
-};
-
-pub const Global = struct {
-    name: str,
-    value: union(enum) {
-        i32: i32,
-    },
-    mutable: bool = false,
-
-    fn writeType(self: @This(), writer: anytype) !void {
-        if (self.mutable) try writer.writeAll("(mut ");
-        switch (self.value) {
-            .i32 => try writer.writeAll("i32"),
-        }
-        if (self.mutable) try writer.writeAll(")");
-    }
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        try std.fmt.format(writer, "(global ${s} ", .{self.name});
-        try self.writeType(writer);
-        switch (self.value) {
-            .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
-        }
-        try writer.writeAll(")");
-    }
-};
-
-pub const Data = struct {
-    offset: u32,
-    bytes: str,
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        const fmt = "(data (i32.const {}) \"{s}\")";
-        try std.fmt.format(writer, fmt, .{ self.offset, self.bytes });
-    }
-};
-
-pub const Export = struct {
-    name: str,
-    desc: union(enum) {
-        func: str,
-        global: str,
-
-        pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-            switch (self) {
-                .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
-                .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
-            }
-        }
-    },
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        try std.fmt.format(writer, "(export \"{s}\" {})", .{ self.name, self.desc });
-    }
-};
-
-pub const Module = struct {
-    imports: []const Import = &.{},
-    globals: []const Global = &.{},
-    datas: []const Data = &.{},
-    funcs: []const Func = &.{},
-    exports: []const Export = &.{},
-
-    pub fn format(self: @This(), comptime _: str, _: Opts, writer: anytype) !void {
-        try writer.writeAll("(module");
-        for (self.imports) |import| {
-            try std.fmt.format(writer, "\n\n    {}", .{import});
-        }
-        for (self.globals) |global| {
-            try std.fmt.format(writer, "\n\n    {}", .{global});
-        }
-        for (self.datas) |data| {
-            try std.fmt.format(writer, "\n\n    {}", .{data});
-        }
-        for (self.funcs) |func| {
-            try std.fmt.format(writer, "\n\n    {}", .{func});
-        }
-        for (self.exports) |e| {
-            try std.fmt.format(writer, "\n\n    {}", .{e});
-        }
-        try writer.writeAll(")");
-    }
-};
+pub fn allocWat(module: Module, allocator: Allocator) !str {
+    var list = std.ArrayList(u8).init(allocator);
+    try wat(module, list.writer());
+    return list.toOwnedSlice();
+}
 
 test "non exported function" {
     const allocator = std.testing.allocator;
@@ -235,7 +266,7 @@ test "non exported function" {
             },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -267,10 +298,10 @@ test "exported function" {
             },
         },
         .exports = &.{
-            .{ .name = "add", .desc = .{ .func = "add" } },
+            .{ .name = "add", .kind = .{ .func = "add" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -304,10 +335,10 @@ test "exported function with new name" {
             },
         },
         .exports = &.{
-            .{ .name = "myAdd", .desc = .{ .func = "add" } },
+            .{ .name = "myAdd", .kind = .{ .func = "add" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -342,9 +373,9 @@ test "function call" {
             },
         },
     }, .exports = &.{
-        .{ .name = "getAnswerPlus1", .desc = .{ .func = "getAnswerPlus1" } },
+        .{ .name = "getAnswerPlus1", .kind = .{ .func = "getAnswerPlus1" } },
     } };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -369,7 +400,7 @@ test "import function" {
             .{
                 .module = "console",
                 .name = "log",
-                .desc = .{
+                .kind = .{
                     .func = .{ .name = "log", .params = &.{.i32} },
                 },
             },
@@ -384,10 +415,10 @@ test "import function" {
             },
         },
         .exports = &.{
-            .{ .name = "logIt", .desc = .{ .func = "logIt" } },
+            .{ .name = "logIt", .kind = .{ .func = "logIt" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -410,7 +441,7 @@ test "import global variable" {
             .{
                 .module = "js",
                 .name = "global",
-                .desc = .{
+                .kind = .{
                     .global = .{ .name = "g", .type = .i32, .mutable = true },
                 },
             },
@@ -434,11 +465,11 @@ test "import global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -486,11 +517,11 @@ test "module only global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -529,10 +560,10 @@ test "immutable global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -572,12 +603,12 @@ test "export global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .desc = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .desc = .{ .func = "incGlobal" } },
-            .{ .name = "g", .desc = .{ .global = "g" } },
+            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
+            .{ .name = "g", .kind = .{ .global = "g" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -609,11 +640,11 @@ test "import memory" {
             .{
                 .module = "js",
                 .name = "log",
-                .desc = .{
+                .kind = .{
                     .func = .{ .name = "log", .params = &.{ .i32, .i32 } },
                 },
             },
-            .{ .module = "js", .name = "mem", .desc = .{ .memory = .{ .min = 1 } } },
+            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .min = 1 } } },
         },
         .datas = &.{
             .{ .offset = 0, .bytes = "Hi" },
@@ -629,10 +660,10 @@ test "import memory" {
             },
         },
         .exports = &.{
-            .{ .name = "writeHi", .desc = .{ .func = "writeHi" } },
+            .{ .name = "writeHi", .kind = .{ .func = "writeHi" } },
         },
     };
-    const actual = try std.fmt.allocPrint(allocator, "{}", .{module});
+    var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module

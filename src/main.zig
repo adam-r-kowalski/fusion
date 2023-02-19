@@ -5,16 +5,16 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
-    const module = fusion.wasm.Module{
+    const module = fusion.web_assembly.Module{
         .imports = &.{
             .{
                 .module = "js",
                 .name = "log",
-                .desc = .{
+                .kind = .{
                     .func = .{ .name = "log", .params = &.{ .i32, .i32 } },
                 },
             },
-            .{ .module = "js", .name = "mem", .desc = .{ .memory = .{ .min = 1 } } },
+            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .min = 1 } } },
         },
         .datas = &.{
             .{ .offset = 0, .bytes = "Hi" },
@@ -30,11 +30,11 @@ pub fn main() !void {
             },
         },
         .exports = &.{
-            .{ .name = "writeHi", .desc = .{ .func = "writeHi" } },
+            .{ .name = "writeHi", .kind = .{ .func = "writeHi" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
-    try std.fmt.format(file.writer(), "{}", .{module});
+    try fusion.web_assembly.wat(module, file.writer());
     const result = try std.ChildProcess.exec(.{
         .allocator = allocator,
         .argv = &.{ "wat2wasm", "temp.wat" },

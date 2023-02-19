@@ -1,6 +1,6 @@
 const std = @import("std");
-pub const wasm = @import("wasm.zig");
+pub const web_assembly = @import("web_assembly.zig");
 
 test "run all tests" {
-	std.testing.refAllDecls(@This());
+    std.testing.refAllDecls(@This());
 }
