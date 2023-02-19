@@ -72,18 +72,34 @@ pub const Parameters = []const Parameter;
 pub const Instruction = union(enum) {
     call: str,
     local_get: str,
+    local_set: str,
+    local_tee: str,
     global_get: str,
     global_set: str,
     i32_add,
+    i32_lt_s,
     i32_const: i32,
+    loop: struct {
+        name: str,
+        body: Instructions,
+    },
+    br_if: str,
 };
 
 pub const Instructions = []const Instruction;
+
+pub const Local = struct {
+    name: str,
+    type: Type,
+};
+
+pub const Locals = []const Local;
 
 pub const Function = struct {
     name: str,
     parameters: Parameters = &.{},
     results: Types = &.{},
+    locals: Locals = &.{},
     body: Instructions,
 };
 
@@ -213,16 +229,38 @@ fn watFunctionResults(results: Types, writer: anytype) !void {
     }
 }
 
-fn watFunctionInstructions(instructions: Instructions, writer: anytype) !void {
+fn watFunctionLocals(locals: Locals, writer: anytype) !void {
+    for (locals) |local| {
+        try std.fmt.format(writer, "\n        (local ${s} ", .{local.name});
+        try watType(local.type, writer);
+        try writer.writeAll(")");
+    }
+    if (locals.len > 0) try writer.writeAll("\n");
+}
+
+fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !void {
     for (instructions) |op| {
-        try writer.writeAll("\n        ");
+        try writer.writeAll("\n");
+        var i: u8 = 0;
+        while (i < indent) : (i += 1) {
+            try writer.writeAll("    ");
+        }
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
             .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
+            .local_set => |value| try std.fmt.format(writer, "(local.set ${s})", .{value}),
+            .local_tee => |value| try std.fmt.format(writer, "(local.tee ${s})", .{value}),
             .global_get => |value| try std.fmt.format(writer, "(global.get ${s})", .{value}),
             .global_set => |value| try std.fmt.format(writer, "(global.set ${s})", .{value}),
             .i32_add => try writer.writeAll("i32.add"),
+            .i32_lt_s => try writer.writeAll("i32.lt_s"),
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
+            .loop => |loop| {
+                try std.fmt.format(writer, "(loop ${s}", .{loop.name});
+                try watInstructions(loop.body, indent + 1, writer);
+                try writer.writeAll(")");
+            },
+            .br_if => |value| try std.fmt.format(writer, "(br_if ${s})", .{value}),
         }
     }
 }
@@ -232,7 +270,8 @@ fn watFunctions(functions: Functions, writer: anytype) !void {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
         try watFunctionParameters(func.parameters, writer);
         try watFunctionResults(func.results, writer);
-        try watFunctionInstructions(func.body, writer);
+        try watFunctionLocals(func.locals, writer);
+        try watInstructions(func.body, 2, writer);
         try writer.writeAll(")");
     }
 }
@@ -854,6 +893,165 @@ test "start function" {
         \\        (call $log))
         \\
         \\    (start $logIt))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "local variables" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "main",
+                .locals = &.{.{ .name = "var", .type = .i32 }},
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .local_set = "var" },
+                    .{ .local_get = "var" },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .start = "main",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $var i32)
+        \\
+        \\        (i32.const 10)
+        \\        (local.set $var)
+        \\        (local.get $var)
+        \\        (call $log))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "tee local variable" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "main",
+                .locals = &.{.{ .name = "var", .type = .i32 }},
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .local_tee = "var" },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .start = "main",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $var i32)
+        \\
+        \\        (i32.const 10)
+        \\        (local.tee $var)
+        \\        (call $log))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "loop" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "main",
+                .locals = &.{.{ .name = "i", .type = .i32 }},
+                .body = &.{
+                    .{
+                        .loop = .{
+                            .name = "my_loop",
+                            .body = &.{
+                                // increment i
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 1 },
+                                .i32_add,
+                                .{ .local_set = "i" },
+                                // log i
+                                .{ .local_get = "i" },
+                                .{ .call = "log" },
+                                // if i < 10 then loop
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 10 },
+                                .i32_lt_s,
+                                .{ .br_if = "my_loop" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .start = "main",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $i i32)
+        \\
+        \\        (loop $my_loop
+        \\            (local.get $i)
+        \\            (i32.const 1)
+        \\            i32.add
+        \\            (local.set $i)
+        \\            (local.get $i)
+        \\            (call $log)
+        \\            (local.get $i)
+        \\            (i32.const 10)
+        \\            i32.lt_s
+        \\            (br_if $my_loop)))
+        \\
+        \\    (start $main))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }

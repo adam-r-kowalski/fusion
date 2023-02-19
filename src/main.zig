@@ -17,14 +17,33 @@ pub fn main() !void {
         },
         .functions = &.{
             .{
-                .name = "logIt",
+                .name = "main",
+                .locals = &.{.{ .name = "i", .type = .i32 }},
                 .body = &.{
-                    .{ .i32_const = 13 },
-                    .{ .call = "log" },
+                    .{
+                        .loop = .{
+                            .name = "my_loop",
+                            .body = &.{
+                                // increment i
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 1 },
+                                .i32_add,
+                                .{ .local_set = "i" },
+                                // log i
+                                .{ .local_get = "i" },
+                                .{ .call = "log" },
+                                // if i < 10 then loop
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 10 },
+                                .i32_lt_s,
+                                .{ .br_if = "my_loop" },
+                            },
+                        },
+                    },
                 },
             },
         },
-        .start = "logIt",
+        .start = "main",
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try fusion.web_assembly.wat(module, file.writer());
