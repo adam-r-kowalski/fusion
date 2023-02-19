@@ -84,6 +84,10 @@ pub const Instruction = union(enum) {
         body: Instructions,
     },
     br_if: str,
+    if_: struct {
+        then: Instructions,
+        else_: Instructions = &.{},
+    },
 };
 
 pub const Instructions = []const Instruction;
@@ -238,13 +242,17 @@ fn watFunctionLocals(locals: Locals, writer: anytype) !void {
     if (locals.len > 0) try writer.writeAll("\n");
 }
 
+fn watIndent(indent: u8, writer: anytype) !void {
+    try writer.writeAll("\n");
+    var i: u8 = 0;
+    while (i < indent) : (i += 1) {
+        try writer.writeAll("    ");
+    }
+}
+
 fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !void {
     for (instructions) |op| {
-        try writer.writeAll("\n");
-        var i: u8 = 0;
-        while (i < indent) : (i += 1) {
-            try writer.writeAll("    ");
-        }
+        try watIndent(indent, writer);
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
             .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
@@ -261,6 +269,20 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
                 try writer.writeAll(")");
             },
             .br_if => |value| try std.fmt.format(writer, "(br_if ${s})", .{value}),
+            .if_ => |if_| {
+                try writer.writeAll("(if");
+                try watIndent(indent + 1, writer);
+                try writer.writeAll("(then");
+                try watInstructions(if_.then, indent + 2, writer);
+                try writer.writeAll(")");
+                if (if_.else_.len > 0) {
+                    try watIndent(indent + 1, writer);
+                    try writer.writeAll("(else");
+                    try watInstructions(if_.else_, indent + 2, writer);
+                    try writer.writeAll(")");
+                }
+                try writer.writeAll(")");
+            },
         }
     }
 }
@@ -1050,6 +1072,62 @@ test "loop" {
         \\            (i32.const 10)
         \\            i32.lt_s
         \\            (br_if $my_loop)))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "if then else" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "main",
+                .body = &.{
+                    .{ .i32_const = 0 },
+                    .{
+                        .if_ = .{
+                            .then = &.{
+                                .{ .i32_const = 1 },
+                                .{ .call = "log" },
+                            },
+                            .else_ = &.{
+                                .{ .i32_const = 0 },
+                                .{ .call = "log" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .start = "main",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (i32.const 0)
+        \\        (if
+        \\            (then
+        \\                (i32.const 1)
+        \\                (call $log))
+        \\            (else
+        \\                (i32.const 0)
+        \\                (call $log))))
         \\
         \\    (start $main))
     ;
