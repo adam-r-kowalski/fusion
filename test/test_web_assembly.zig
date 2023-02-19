@@ -989,3 +989,46 @@ test "return" {
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
+
+test "drop" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "main",
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 20 },
+                    .drop,
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .start = "main",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (i32.const 10)
+        \\        (i32.const 20)
+        \\        drop
+        \\        (call $log))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}

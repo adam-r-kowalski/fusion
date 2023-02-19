@@ -6,21 +6,27 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
     const module = fusion.web_assembly.Module{
-        .functions = &.{
+        .imports = &.{
             .{
-                .name = "get_90",
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 90 },
-                    // return the second value (90); the first is discarded
-                    .return_,
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
                 },
             },
         },
-        .exports = &.{
-            .{ .name = "get_90", .kind = .{ .function = "get_90" } },
+        .functions = &.{
+            .{
+                .name = "main",
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 20 },
+                    .drop,
+                    .{ .call = "log" },
+                },
+            },
         },
+        .start = "main",
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try fusion.web_assembly.wat(module, file.writer());

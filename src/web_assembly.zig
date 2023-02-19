@@ -98,6 +98,7 @@ pub const Instruction = union(enum) {
     select,
     nop,
     return_,
+    drop,
 };
 
 pub const Instructions = []const Instruction;
@@ -304,6 +305,7 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
             .select => try writer.writeAll("select"),
             .nop => try writer.writeAll("nop"),
             .return_ => try writer.writeAll("return"),
+            .drop => try writer.writeAll("drop"),
         }
     }
 }
