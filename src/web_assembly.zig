@@ -94,6 +94,10 @@ pub const Instruction = union(enum) {
     },
     br: str,
     br_if: str,
+    unreachable_,
+    select,
+    nop,
+    return_,
 };
 
 pub const Instructions = []const Instruction;
@@ -296,6 +300,10 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
             },
             .br => |value| try std.fmt.format(writer, "(br ${s})", .{value}),
             .br_if => |value| try std.fmt.format(writer, "(br_if ${s})", .{value}),
+            .unreachable_ => try writer.writeAll("unreachable"),
+            .select => try writer.writeAll("select"),
+            .nop => try writer.writeAll("nop"),
+            .return_ => try writer.writeAll("return"),
         }
     }
 }

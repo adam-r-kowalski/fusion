@@ -6,44 +6,20 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
     const module = fusion.web_assembly.Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
         .functions = &.{
             .{
-                .name = "log_if_not_100",
-                .parameters = &.{.{ .name = "num", .type = .i32 }},
+                .name = "get_90",
+                .results = &.{.i32},
                 .body = &.{
-                    .{
-                        .block = .{
-                            .name = "my_block",
-                            .body = &.{
-                                .{ .local_get = "num" },
-                                .{ .i32_const = 100 },
-                                .i32_eq,
-                                .{
-                                    .if_ = .{
-                                        .then = &.{
-                                            .{ .br = "my_block" },
-                                        },
-                                    },
-                                },
-                                .{ .local_get = "num" },
-                                .{ .call = "log" },
-                            },
-                        },
-                    },
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 90 },
+                    // return the second value (90); the first is discarded
+                    .return_,
                 },
             },
         },
         .exports = &.{
-            .{ .name = "log_if_not_100", .kind = .{ .function = "log_if_not_100" } },
+            .{ .name = "get_90", .kind = .{ .function = "get_90" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});

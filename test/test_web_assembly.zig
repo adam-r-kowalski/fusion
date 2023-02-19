@@ -868,3 +868,124 @@ test "block" {
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
+
+test "unreachable" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .functions = &.{
+            .{
+                .name = "throw",
+                .body = &.{.unreachable_},
+            },
+        },
+        .exports = &.{
+            .{ .name = "throw", .kind = .{ .function = "throw" } },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $throw
+        \\        unreachable)
+        \\
+        \\    (export "throw" (func $throw)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "select" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "select_simple",
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 20 },
+                    .{ .i32_const = 0 },
+                    .select,
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .start = "select_simple",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $select_simple
+        \\        (i32.const 10)
+        \\        (i32.const 20)
+        \\        (i32.const 0)
+        \\        select
+        \\        (call $log))
+        \\
+        \\    (start $select_simple))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "nop" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .functions = &.{
+            .{
+                .name = "do_nothing",
+                .body = &.{.nop},
+            },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $do_nothing
+        \\        nop))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "return" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .functions = &.{
+            .{
+                .name = "get_90",
+                .results = &.{.i32},
+                .body = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 90 },
+                    // return the second value (90); the first is discarded
+                    .return_,
+                },
+            },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (func $get_90 (result i32)
+        \\        (i32.const 10)
+        \\        (i32.const 90)
+        \\        return))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
