@@ -12,8 +12,9 @@ pub const Type = enum {
 
 const Types = []const Type;
 
-pub const Limit = struct {
-    min: u32,
+pub const Memory = struct {
+    name: str,
+    initial: u32,
     max: ?u32 = null,
 };
 
@@ -21,9 +22,9 @@ pub const Import = struct {
     module: str,
     name: str,
     kind: union(enum) {
-        func: struct {
+        function: struct {
             name: str,
-            params: Types = &.{},
+            parameters: Types = &.{},
             results: Types = &.{},
         },
         global: struct {
@@ -31,7 +32,7 @@ pub const Import = struct {
             type: Type,
             mutable: bool = false,
         },
-        memory: Limit,
+        memory: Memory,
     },
 };
 
@@ -54,14 +55,14 @@ pub const Data = struct {
 
 const Datas = []const Data;
 
-pub const Param = struct {
+pub const Parameter = struct {
     name: str,
     type: Type,
 };
 
-const Params = []const Param;
+const Parameters = []const Parameter;
 
-pub const Op = union(enum) {
+pub const Instruction = union(enum) {
     call: str,
     local_get: str,
     global_get: str,
@@ -70,21 +71,21 @@ pub const Op = union(enum) {
     i32_const: i32,
 };
 
-const Body = []const Op;
+const Instructions = []const Instruction;
 
-pub const Func = struct {
+pub const Function = struct {
     name: str,
-    params: Params = &.{},
+    parameters: Parameters = &.{},
     results: Types = &.{},
-    body: Body,
+    body: Instructions,
 };
 
-const Funcs = []const Func;
+const Functions = []const Function;
 
 pub const Export = struct {
     name: str,
     kind: union(enum) {
-        func: str,
+        function: str,
         global: str,
     },
 };
@@ -95,7 +96,7 @@ pub const Module = struct {
     imports: Imports = &.{},
     globals: Globals = &.{},
     datas: Datas = &.{},
-    funcs: Funcs = &.{},
+    functions: Functions = &.{},
     exports: Exports = &.{},
 };
 
@@ -114,11 +115,11 @@ fn watImports(imports: Imports, writer: anytype) !void {
         const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
         try std.fmt.format(writer, fmt, .{ import.module, import.name });
         switch (import.kind) {
-            .func => |func| {
+            .function => |func| {
                 try std.fmt.format(writer, "(func ${s}", .{func.name});
-                if (func.params.len > 0) {
+                if (func.parameters.len > 0) {
                     try writer.writeAll(" (param");
-                    for (func.params) |param| {
+                    for (func.parameters) |param| {
                         try writer.writeAll(" ");
                         try watType(param, writer);
                     }
@@ -146,8 +147,8 @@ fn watImports(imports: Imports, writer: anytype) !void {
                 }
                 try writer.writeAll(")");
             },
-            .memory => |limit| {
-                try std.fmt.format(writer, "(memory {})", .{limit.min});
+            .memory => |memory| {
+                try std.fmt.format(writer, "(memory ${s} {})", .{ memory.name, memory.initial });
             },
         }
         try writer.writeAll(")");
@@ -180,15 +181,15 @@ fn watDatas(datas: Datas, writer: anytype) !void {
     }
 }
 
-fn watFuncParams(params: Params, writer: anytype) !void {
-    for (params) |param| {
+fn watFunctionParameters(parameters: Parameters, writer: anytype) !void {
+    for (parameters) |param| {
         try std.fmt.format(writer, " (param ${s} ", .{param.name});
         try watType(param.type, writer);
         try writer.writeAll(")");
     }
 }
 
-fn watFuncResults(results: Types, writer: anytype) !void {
+fn watFunctionResults(results: Types, writer: anytype) !void {
     for (results) |result| {
         try writer.writeAll(" (result ");
         try watType(result, writer);
@@ -196,8 +197,8 @@ fn watFuncResults(results: Types, writer: anytype) !void {
     }
 }
 
-fn watFuncBody(body: Body, writer: anytype) !void {
-    for (body) |op| {
+fn watFunctionInstructions(instructions: Instructions, writer: anytype) !void {
+    for (instructions) |op| {
         try writer.writeAll("\n        ");
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
@@ -210,12 +211,12 @@ fn watFuncBody(body: Body, writer: anytype) !void {
     }
 }
 
-fn watFuncs(funcs: Funcs, writer: anytype) !void {
-    for (funcs) |func| {
+fn watFunctions(functions: Functions, writer: anytype) !void {
+    for (functions) |func| {
         try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
-        try watFuncParams(func.params, writer);
-        try watFuncResults(func.results, writer);
-        try watFuncBody(func.body, writer);
+        try watFunctionParameters(func.parameters, writer);
+        try watFunctionResults(func.results, writer);
+        try watFunctionInstructions(func.body, writer);
         try writer.writeAll(")");
     }
 }
@@ -224,7 +225,7 @@ fn watExports(exports: Exports, writer: anytype) !void {
     for (exports) |e| {
         try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e.name});
         switch (e.kind) {
-            .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
+            .function => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
             .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
         }
         try writer.writeAll(")");
@@ -236,7 +237,7 @@ pub fn wat(module: Module, writer: anytype) !void {
     try watImports(module.imports, writer);
     try watGlobals(module.globals, writer);
     try watDatas(module.datas, writer);
-    try watFuncs(module.funcs, writer);
+    try watFunctions(module.functions, writer);
     try watExports(module.exports, writer);
     try writer.writeAll(")");
 }
@@ -250,10 +251,10 @@ pub fn allocWat(module: Module, allocator: Allocator) !str {
 test "non exported function" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "add",
-                .params = &.{
+                .parameters = &.{
                     .{ .name = "lhs", .type = .i32 },
                     .{ .name = "rhs", .type = .i32 },
                 },
@@ -282,10 +283,10 @@ test "non exported function" {
 test "exported function" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "add",
-                .params = &.{
+                .parameters = &.{
                     .{ .name = "lhs", .type = .i32 },
                     .{ .name = "rhs", .type = .i32 },
                 },
@@ -298,7 +299,7 @@ test "exported function" {
             },
         },
         .exports = &.{
-            .{ .name = "add", .kind = .{ .func = "add" } },
+            .{ .name = "add", .kind = .{ .function = "add" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -319,10 +320,10 @@ test "exported function" {
 test "exported function with new name" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "add",
-                .params = &.{
+                .parameters = &.{
                     .{ .name = "lhs", .type = .i32 },
                     .{ .name = "rhs", .type = .i32 },
                 },
@@ -335,7 +336,7 @@ test "exported function with new name" {
             },
         },
         .exports = &.{
-            .{ .name = "myAdd", .kind = .{ .func = "add" } },
+            .{ .name = "myAdd", .kind = .{ .function = "add" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -355,7 +356,7 @@ test "exported function with new name" {
 
 test "function call" {
     const allocator = std.testing.allocator;
-    const module = Module{ .funcs = &.{
+    const module = Module{ .functions = &.{
         .{
             .name = "getAnswer",
             .results = &.{.i32},
@@ -373,7 +374,7 @@ test "function call" {
             },
         },
     }, .exports = &.{
-        .{ .name = "getAnswerPlus1", .kind = .{ .func = "getAnswerPlus1" } },
+        .{ .name = "getAnswerPlus1", .kind = .{ .function = "getAnswerPlus1" } },
     } };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -401,11 +402,11 @@ test "import function" {
                 .module = "console",
                 .name = "log",
                 .kind = .{
-                    .func = .{ .name = "log", .params = &.{.i32} },
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
                 },
             },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "logIt",
                 .body = &.{
@@ -415,7 +416,7 @@ test "import function" {
             },
         },
         .exports = &.{
-            .{ .name = "logIt", .kind = .{ .func = "logIt" } },
+            .{ .name = "logIt", .kind = .{ .function = "logIt" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -446,7 +447,7 @@ test "import global variable" {
                 },
             },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "getGlobal",
                 .results = &.{.i32},
@@ -465,8 +466,8 @@ test "import global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -498,7 +499,7 @@ test "module only global variable" {
         .globals = &.{
             .{ .name = "g", .value = .{ .i32 = 42 }, .mutable = true },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "getGlobal",
                 .results = &.{.i32},
@@ -517,8 +518,8 @@ test "module only global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -550,7 +551,7 @@ test "immutable global variable" {
         .globals = &.{
             .{ .name = "g", .value = .{ .i32 = 42 } },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "getGlobal",
                 .results = &.{.i32},
@@ -560,7 +561,7 @@ test "immutable global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -584,7 +585,7 @@ test "export global variable" {
         .globals = &.{
             .{ .name = "g", .value = .{ .i32 = 42 }, .mutable = true },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "getGlobal",
                 .results = &.{.i32},
@@ -603,8 +604,8 @@ test "export global variable" {
             },
         },
         .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } },
+            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
+            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
             .{ .name = "g", .kind = .{ .global = "g" } },
         },
     };
@@ -641,15 +642,15 @@ test "import memory" {
                 .module = "js",
                 .name = "log",
                 .kind = .{
-                    .func = .{ .name = "log", .params = &.{ .i32, .i32 } },
+                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
                 },
             },
-            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .min = 1 } } },
+            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .name = "mem", .initial = 1 } } },
         },
         .datas = &.{
             .{ .offset = 0, .bytes = "Hi" },
         },
-        .funcs = &.{
+        .functions = &.{
             .{
                 .name = "writeHi",
                 .body = &.{
@@ -660,7 +661,7 @@ test "import memory" {
             },
         },
         .exports = &.{
-            .{ .name = "writeHi", .kind = .{ .func = "writeHi" } },
+            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -670,7 +671,7 @@ test "import memory" {
         \\
         \\    (import "js" "log" (func $log (param i32 i32)))
         \\
-        \\    (import "js" "mem" (memory 1))
+        \\    (import "js" "mem" (memory $mem 1))
         \\
         \\    (data (i32.const 0) "Hi")
         \\
@@ -683,3 +684,54 @@ test "import memory" {
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
+
+// test "module only memory" {
+//     const allocator = std.testing.allocator;
+//     const module = Module{
+//         .imports = &.{
+//             .{
+//                 .module = "js",
+//                 .name = "log",
+//                 .kind = .{
+//                     .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
+//                 },
+//             },
+//         },
+//         .memories = &.{},
+//         .datas = &.{
+//             .{ .offset = 0, .bytes = "Hi" },
+//         },
+//         .functions = &.{
+//             .{
+//                 .name = "writeHi",
+//                 .body = &.{
+//                     .{ .i32_const = 0 },
+//                     .{ .i32_const = 2 },
+//                     .{ .call = "log" },
+//                 },
+//             },
+//         },
+//         .exports = &.{
+//             .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
+//         },
+//     };
+//     var actual = try allocWat(module, allocator);
+//     defer allocator.free(actual);
+//     const expected =
+//         \\(module
+//         \\
+//         \\    (import "js" "log" (func $log (param i32 i32)))
+//         \\
+//         \\    (import "js" "mem" (memory 1))
+//         \\
+//         \\    (data (i32.const 0) "Hi")
+//         \\
+//         \\    (func $writeHi
+//         \\        (i32.const 0)
+//         \\        (i32.const 2)
+//         \\        (call $log))
+//         \\
+//         \\    (export "writeHi" (func $writeHi)))
+//     ;
+//     try std.testing.expectEqualStrings(expected, actual);
+// }
