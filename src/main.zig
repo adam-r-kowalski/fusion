@@ -8,33 +8,23 @@ pub fn main() !void {
     const module = fusion.web_assembly.Module{
         .imports = &.{
             .{
-                .module = "js",
+                .module = "console",
                 .name = "log",
                 .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
                 },
             },
         },
-        .memories = &.{
-            .{ .name = "mem", .initial = 1 },
-        },
-        .datas = &.{
-            .{ .offset = 0, .bytes = "Hi" },
-        },
         .functions = &.{
             .{
-                .name = "writeHi",
+                .name = "logIt",
                 .body = &.{
-                    .{ .i32_const = 0 },
-                    .{ .i32_const = 2 },
+                    .{ .i32_const = 13 },
                     .{ .call = "log" },
                 },
             },
         },
-        .exports = &.{
-            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
-            .{ .name = "mem", .kind = .{ .memory = "mem" } },
-        },
+        .start = "logIt",
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try fusion.web_assembly.wat(module, file.writer());

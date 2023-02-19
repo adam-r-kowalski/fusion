@@ -107,6 +107,7 @@ pub const Module = struct {
     datas: Datas = &.{},
     functions: Functions = &.{},
     exports: Exports = &.{},
+    start: ?str = null,
 };
 
 fn watType(t: Type, writer: anytype) !void {
@@ -248,6 +249,12 @@ fn watExports(exports: Exports, writer: anytype) !void {
     }
 }
 
+fn watStart(start: ?str, writer: anytype) !void {
+    if (start) |name| {
+        try std.fmt.format(writer, "\n\n    (start ${s})", .{name});
+    }
+}
+
 pub fn wat(module: Module, writer: anytype) !void {
     try writer.writeAll("(module");
     try watImports(module.imports, writer);
@@ -256,6 +263,7 @@ pub fn wat(module: Module, writer: anytype) !void {
     try watDatas(module.datas, writer);
     try watFunctions(module.functions, writer);
     try watExports(module.exports, writer);
+    try watStart(module.start, writer);
     try writer.writeAll(")");
 }
 
@@ -807,6 +815,45 @@ test "export memory" {
         \\    (export "writeHi" (func $writeHi))
         \\
         \\    (export "mem" (memory $mem)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "start function" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "logIt",
+                .body = &.{
+                    .{ .i32_const = 13 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .start = "logIt",
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $logIt
+        \\        (i32.const 13)
+        \\        (call $log))
+        \\
+        \\    (start $logIt))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
