@@ -14,7 +14,9 @@ pub fn main() !void {
                     .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
                 },
             },
-            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .name = "mem", .initial = 1 } } },
+        },
+        .memories = &.{
+            .{ .name = "mem", .initial = 1 },
         },
         .datas = &.{
             .{ .offset = 0, .bytes = "Hi" },
@@ -31,6 +33,7 @@ pub fn main() !void {
         },
         .exports = &.{
             .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
+            .{ .name = "mem", .kind = .{ .memory = "mem" } },
         },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});

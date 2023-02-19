@@ -1,3 +1,8 @@
+// Web Assembly types and operations for generating wat (web assembly text format).
+// A writer is used throughout and represents any type which has a `writeAll` function
+// which takes a string ([] const u8). Examples of writers are files, arrays, etc.
+// This allows for no allocation writing to a file.
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const str = []const u8;
@@ -10,13 +15,15 @@ pub const Type = enum {
     v128,
 };
 
-const Types = []const Type;
+pub const Types = []const Type;
 
 pub const Memory = struct {
     name: str,
     initial: u32,
     max: ?u32 = null,
 };
+
+pub const Memories = []const Memory;
 
 pub const Import = struct {
     module: str,
@@ -36,7 +43,7 @@ pub const Import = struct {
     },
 };
 
-const Imports = []const Import;
+pub const Imports = []const Import;
 
 pub const Global = struct {
     name: str,
@@ -46,21 +53,21 @@ pub const Global = struct {
     mutable: bool = false,
 };
 
-const Globals = []const Global;
+pub const Globals = []const Global;
 
 pub const Data = struct {
     offset: u32,
     bytes: str,
 };
 
-const Datas = []const Data;
+pub const Datas = []const Data;
 
 pub const Parameter = struct {
     name: str,
     type: Type,
 };
 
-const Parameters = []const Parameter;
+pub const Parameters = []const Parameter;
 
 pub const Instruction = union(enum) {
     call: str,
@@ -71,7 +78,7 @@ pub const Instruction = union(enum) {
     i32_const: i32,
 };
 
-const Instructions = []const Instruction;
+pub const Instructions = []const Instruction;
 
 pub const Function = struct {
     name: str,
@@ -80,20 +87,22 @@ pub const Function = struct {
     body: Instructions,
 };
 
-const Functions = []const Function;
+pub const Functions = []const Function;
 
 pub const Export = struct {
     name: str,
     kind: union(enum) {
         function: str,
         global: str,
+        memory: str,
     },
 };
 
-const Exports = []const Export;
+pub const Exports = []const Export;
 
 pub const Module = struct {
     imports: Imports = &.{},
+    memories: Memories = &.{},
     globals: Globals = &.{},
     datas: Datas = &.{},
     functions: Functions = &.{},
@@ -152,6 +161,12 @@ fn watImports(imports: Imports, writer: anytype) !void {
             },
         }
         try writer.writeAll(")");
+    }
+}
+
+fn watMemories(memories: Memories, writer: anytype) !void {
+    for (memories) |memory| {
+        try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ memory.name, memory.initial });
     }
 }
 
@@ -227,6 +242,7 @@ fn watExports(exports: Exports, writer: anytype) !void {
         switch (e.kind) {
             .function => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
             .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
+            .memory => |name| try std.fmt.format(writer, "(memory ${s})", .{name}),
         }
         try writer.writeAll(")");
     }
@@ -235,6 +251,7 @@ fn watExports(exports: Exports, writer: anytype) !void {
 pub fn wat(module: Module, writer: anytype) !void {
     try writer.writeAll("(module");
     try watImports(module.imports, writer);
+    try watMemories(module.memories, writer);
     try watGlobals(module.globals, writer);
     try watDatas(module.datas, writer);
     try watFunctions(module.functions, writer);
@@ -685,53 +702,111 @@ test "import memory" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-// test "module only memory" {
-//     const allocator = std.testing.allocator;
-//     const module = Module{
-//         .imports = &.{
-//             .{
-//                 .module = "js",
-//                 .name = "log",
-//                 .kind = .{
-//                     .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
-//                 },
-//             },
-//         },
-//         .memories = &.{},
-//         .datas = &.{
-//             .{ .offset = 0, .bytes = "Hi" },
-//         },
-//         .functions = &.{
-//             .{
-//                 .name = "writeHi",
-//                 .body = &.{
-//                     .{ .i32_const = 0 },
-//                     .{ .i32_const = 2 },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .exports = &.{
-//             .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
-//         },
-//     };
-//     var actual = try allocWat(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "js" "log" (func $log (param i32 i32)))
-//         \\
-//         \\    (import "js" "mem" (memory 1))
-//         \\
-//         \\    (data (i32.const 0) "Hi")
-//         \\
-//         \\    (func $writeHi
-//         \\        (i32.const 0)
-//         \\        (i32.const 2)
-//         \\        (call $log))
-//         \\
-//         \\    (export "writeHi" (func $writeHi)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
+test "module only memory" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "js",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
+                },
+            },
+        },
+        .memories = &.{
+            .{ .name = "mem", .initial = 1 },
+        },
+        .datas = &.{
+            .{ .offset = 0, .bytes = "Hi" },
+        },
+        .functions = &.{
+            .{
+                .name = "writeHi",
+                .body = &.{
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "js" "log" (func $log (param i32 i32)))
+        \\
+        \\    (memory $mem 1)
+        \\
+        \\    (data (i32.const 0) "Hi")
+        \\
+        \\    (func $writeHi
+        \\        (i32.const 0)
+        \\        (i32.const 2)
+        \\        (call $log))
+        \\
+        \\    (export "writeHi" (func $writeHi)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "export memory" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "js",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
+                },
+            },
+        },
+        .memories = &.{
+            .{ .name = "mem", .initial = 1 },
+        },
+        .datas = &.{
+            .{ .offset = 0, .bytes = "Hi" },
+        },
+        .functions = &.{
+            .{
+                .name = "writeHi",
+                .body = &.{
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
+            .{ .name = "mem", .kind = .{ .memory = "mem" } },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "js" "log" (func $log (param i32 i32)))
+        \\
+        \\    (memory $mem 1)
+        \\
+        \\    (data (i32.const 0) "Hi")
+        \\
+        \\    (func $writeHi
+        \\        (i32.const 0)
+        \\        (i32.const 2)
+        \\        (call $log))
+        \\
+        \\    (export "writeHi" (func $writeHi))
+        \\
+        \\    (export "mem" (memory $mem)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
