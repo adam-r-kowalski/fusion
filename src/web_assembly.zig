@@ -78,16 +78,22 @@ pub const Instruction = union(enum) {
     global_set: str,
     i32_add,
     i32_lt_s,
+    i32_eq,
     i32_const: i32,
+    block: struct {
+        name: str,
+        body: Instructions,
+    },
     loop: struct {
         name: str,
         body: Instructions,
     },
-    br_if: str,
     if_: struct {
         then: Instructions,
         else_: Instructions = &.{},
     },
+    br: str,
+    br_if: str,
 };
 
 pub const Instructions = []const Instruction;
@@ -262,13 +268,18 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
             .global_set => |value| try std.fmt.format(writer, "(global.set ${s})", .{value}),
             .i32_add => try writer.writeAll("i32.add"),
             .i32_lt_s => try writer.writeAll("i32.lt_s"),
+            .i32_eq => try writer.writeAll("i32.eq"),
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
+            .block => |block| {
+                try std.fmt.format(writer, "(block ${s}", .{block.name});
+                try watInstructions(block.body, indent + 1, writer);
+                try writer.writeAll(")");
+            },
             .loop => |loop| {
                 try std.fmt.format(writer, "(loop ${s}", .{loop.name});
                 try watInstructions(loop.body, indent + 1, writer);
                 try writer.writeAll(")");
             },
-            .br_if => |value| try std.fmt.format(writer, "(br_if ${s})", .{value}),
             .if_ => |if_| {
                 try writer.writeAll("(if");
                 try watIndent(indent + 1, writer);
@@ -283,6 +294,8 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
                 }
                 try writer.writeAll(")");
             },
+            .br => |value| try std.fmt.format(writer, "(br ${s})", .{value}),
+            .br_if => |value| try std.fmt.format(writer, "(br_if ${s})", .{value}),
         }
     }
 }
@@ -1130,6 +1143,72 @@ test "if then else" {
         \\                (call $log))))
         \\
         \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "block" {
+    const allocator = std.testing.allocator;
+    const module = Module{
+        .imports = &.{
+            .{
+                .module = "console",
+                .name = "log",
+                .kind = .{
+                    .function = .{ .name = "log", .parameters = &.{.i32} },
+                },
+            },
+        },
+        .functions = &.{
+            .{
+                .name = "log_if_not_100",
+                .parameters = &.{.{ .name = "num", .type = .i32 }},
+                .body = &.{
+                    .{
+                        .block = .{
+                            .name = "my_block",
+                            .body = &.{
+                                .{ .local_get = "num" },
+                                .{ .i32_const = 100 },
+                                .i32_eq,
+                                .{
+                                    .if_ = .{
+                                        .then = &.{
+                                            .{ .br = "my_block" },
+                                        },
+                                    },
+                                },
+                                .{ .local_get = "num" },
+                                .{ .call = "log" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .exports = &.{
+            .{ .name = "log_if_not_100", .kind = .{ .function = "log_if_not_100" } },
+        },
+    };
+    var actual = try allocWat(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $log_if_not_100 (param $num i32)
+        \\        (block $my_block
+        \\            (local.get $num)
+        \\            (i32.const 100)
+        \\            i32.eq
+        \\            (if
+        \\                (then
+        \\                    (br $my_block)))
+        \\            (local.get $num)
+        \\            (call $log)))
+        \\
+        \\    (export "log_if_not_100" (func $log_if_not_100)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }

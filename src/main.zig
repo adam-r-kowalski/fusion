@@ -17,17 +17,24 @@ pub fn main() !void {
         },
         .functions = &.{
             .{
-                .name = "main",
+                .name = "log_if_not_100",
+                .parameters = &.{.{ .name = "num", .type = .i32 }},
                 .body = &.{
-                    .{ .i32_const = 1 },
                     .{
-                        .if_ = .{
-                            .then = &.{
-                                .{ .i32_const = 1 },
-                                .{ .call = "log" },
-                            },
-                            .else_ = &.{
-                                .{ .i32_const = 0 },
+                        .block = .{
+                            .name = "my_block",
+                            .body = &.{
+                                .{ .local_get = "num" },
+                                .{ .i32_const = 100 },
+                                .i32_eq,
+                                .{
+                                    .if_ = .{
+                                        .then = &.{
+                                            .{ .br = "my_block" },
+                                        },
+                                    },
+                                },
+                                .{ .local_get = "num" },
                                 .{ .call = "log" },
                             },
                         },
@@ -35,7 +42,9 @@ pub fn main() !void {
                 },
             },
         },
-        .start = "main",
+        .exports = &.{
+            .{ .name = "log_if_not_100", .kind = .{ .function = "log_if_not_100" } },
+        },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try fusion.web_assembly.wat(module, file.writer());
