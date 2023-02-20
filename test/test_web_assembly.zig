@@ -617,16 +617,11 @@ test "block" {
 
 test "unreachable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .funcs = &.{
-            .{
-                .name = "throw",
-                .ops = &.{.unreachable_},
-            },
-        },
-        .exports = &.{
-            .{ .name = "throw", .kind = .{ .func = "throw" } },
-        },
+    const module = &.{
+        func("throw", &.{}, &.{}, &.{
+            .unreachable_,
+        }),
+        exportFunc("throw", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -643,27 +638,16 @@ test "unreachable" {
 
 test "select" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
-            },
-        },
-        .funcs = &.{
-            .{
-                .name = "select_simple",
-                .ops = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 20 },
-                    .{ .i32_const = 0 },
-                    .select,
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "select_simple",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("select_simple", &.{}, &.{}, &.{
+            .{ .i32_const = 10 },
+            .{ .i32_const = 20 },
+            .{ .i32_const = 0 },
+            .select,
+            .{ .call = "log" },
+        }),
+        start("select_simple"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -686,13 +670,8 @@ test "select" {
 
 test "nop" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .funcs = &.{
-            .{
-                .name = "do_nothing",
-                .ops = &.{.nop},
-            },
-        },
+    const module = &.{
+        func("do_nothing", &.{}, &.{}, &.{.nop}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -707,19 +686,13 @@ test "nop" {
 
 test "return" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .funcs = &.{
-            .{
-                .name = "get_90",
-                .results = &.{.i32},
-                .ops = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 90 },
-                    // return the second value (90); the first is discarded
-                    .return_,
-                },
-            },
-        },
+    const module = &.{
+        func("get_90", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 10 },
+            .{ .i32_const = 90 },
+            // return the second value (90); the first is discarded
+            .return_,
+        }),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -736,26 +709,15 @@ test "return" {
 
 test "drop" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
-            },
-        },
-        .funcs = &.{
-            .{
-                .name = "main",
-                .ops = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 20 },
-                    .drop,
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            .{ .i32_const = 10 },
+            .{ .i32_const = 20 },
+            .drop,
+            .{ .call = "log" },
+        }),
+        start("main"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
