@@ -22,6 +22,7 @@ const importMemory = fusion.web_assembly.importMemory;
 const exportGlobal = fusion.web_assembly.exportGlobal;
 const exportFunc = fusion.web_assembly.exportFunc;
 const exportMemory = fusion.web_assembly.exportMemory;
+const exportTable = fusion.web_assembly.exportTable;
 
 test "non exported function" {
     const allocator = std.testing.allocator;
@@ -780,6 +781,53 @@ test "tables" {
         \\    (func $callByIndex (param $i i32) (result i32)
         \\        (local.get $i)
         \\        (call_indirect (type $return_i32))))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "export table" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        table("table", 2),
+        func("f", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 42 },
+        }),
+        func("g", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 13 },
+        }),
+        elem(0, "f"),
+        elem(1, "g"),
+        functype("return_i32", &.{}, &.{.i32}),
+        func("callByIndex", &.{p("i", .i32)}, &.{.i32}, &.{
+            .{ .local_get = "i" },
+            .{ .call_indirect = "return_i32" },
+        }),
+        exportTable("table", .{}),
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (table $table 2 funcref)
+        \\
+        \\    (func $f (result i32)
+        \\        (i32.const 42))
+        \\
+        \\    (func $g (result i32)
+        \\        (i32.const 13))
+        \\
+        \\    (elem (i32.const 0) $f)
+        \\
+        \\    (elem (i32.const 1) $g)
+        \\
+        \\    (type $return_i32 (func (result i32)))
+        \\
+        \\    (func $callByIndex (param $i i32) (result i32)
+        \\        (local.get $i)
+        \\        (call_indirect (type $return_i32)))
+        \\
+        \\    (export "table" (table $table)))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }

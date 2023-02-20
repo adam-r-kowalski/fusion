@@ -131,6 +131,7 @@ pub const Export = struct {
         func: []const u8,
         global: []const u8,
         memory: []const u8,
+        table: []const u8,
     },
 };
 
@@ -351,6 +352,7 @@ fn watExport(e: Export, writer: anytype) !void {
         .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
         .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
         .memory => |name| try std.fmt.format(writer, "(memory ${s})", .{name}),
+        .table => |name| try std.fmt.format(writer, "(table ${s})", .{name}),
     }
     try writer.writeAll(")");
 }
@@ -526,4 +528,9 @@ pub fn exportGlobal(name: []const u8, config: struct { as: []const u8 = "" }) To
 pub fn exportMemory(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
     const as = if (config.as.len > 0) config.as else name;
     return .{ .export_ = .{ .name = as, .kind = .{ .memory = name } } };
+}
+
+pub fn exportTable(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
+    const as = if (config.as.len > 0) config.as else name;
+    return .{ .export_ = .{ .name = as, .kind = .{ .table = name } } };
 }
