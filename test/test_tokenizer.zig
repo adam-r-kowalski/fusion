@@ -9,6 +9,7 @@ fn expectEqualToken(expected: Token, actual: Token) !void {
         .symbol => try std.testing.expectEqualStrings(expected.symbol, actual.symbol),
         .int => try std.testing.expectEqualStrings(expected.int, actual.int),
         .float => try std.testing.expectEqualStrings(expected.float, actual.float),
+        else => try std.testing.expectEqual(expected, actual),
     }
 }
 
@@ -50,6 +51,67 @@ test "numbers" {
         .{ .float = "-.25" },
         .{ .int = "1_000" },
         .{ .float = "1_000." },
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "braces brackets and parens" {
+    const allocator = std.testing.allocator;
+    const source = "[{()}]";
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .left_bracket,
+        .left_brace,
+        .left_paren,
+        .right_paren,
+        .right_brace,
+        .right_bracket,
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "operators" {
+    const allocator = std.testing.allocator;
+    // const source = "== != <= >=";
+    const source = "= < > + - * / . & ^ not and or";
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .equal,
+        .less,
+        .greater,
+        .plus,
+        .minus,
+        .times,
+        .div,
+        .dot,
+        .ampersand,
+        .caret,
+        .not,
+        .and_,
+        .or_,
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "function" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\main = () {
+        \\    42
+        \\}
+    ;
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .symbol = "main" },
+        .equal,
+        .left_paren,
+        .right_paren,
+        .left_brace,
+        .{ .int = "42" },
+        .right_brace,
     };
     try expectEqualTokens(expected, actual);
 }
