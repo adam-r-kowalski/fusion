@@ -9,6 +9,8 @@ const memory = fusion.web_assembly.memory;
 const start = fusion.web_assembly.start;
 const local = fusion.web_assembly.local;
 const loop = fusion.web_assembly.loop;
+const block = fusion.web_assembly.block;
+const when = fusion.web_assembly.when;
 const if_ = fusion.web_assembly.if_;
 const Module = fusion.web_assembly.Module;
 const importGlobal = fusion.web_assembly.importGlobal;
@@ -574,44 +576,21 @@ test "if then else" {
 
 test "block" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
-            },
-        },
-        .funcs = &.{
-            .{
-                .name = "log_if_not_100",
-                .params = &.{.{ .name = "num", .type = .i32 }},
-                .ops = &.{
-                    .{
-                        .block = .{
-                            .name = "my_block",
-                            .ops = &.{
-                                .{ .local_get = "num" },
-                                .{ .i32_const = 100 },
-                                .i32_eq,
-                                .{
-                                    .if_ = .{
-                                        .then = &.{
-                                            .{ .br = "my_block" },
-                                        },
-                                    },
-                                },
-                                .{ .local_get = "num" },
-                                .{ .call = "log" },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "log_if_not_100", .kind = .{ .func = "log_if_not_100" } },
-        },
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("log_if_not_100", &.{p("num", .i32)}, &.{}, &.{
+            block("my_block", &.{
+                .{ .local_get = "num" },
+                .{ .i32_const = 100 },
+                .i32_eq,
+                when(&.{
+                    .{ .br = "my_block" },
+                }),
+                .{ .local_get = "num" },
+                .{ .call = "log" },
+            }),
+        }),
+        exportFunc("log_if_not_100", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);

@@ -248,9 +248,9 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
             .i32_lt_s => try writer.writeAll("i32.lt_s"),
             .i32_eq => try writer.writeAll("i32.eq"),
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
-            .block => |block| {
-                try std.fmt.format(writer, "(block ${s}", .{block.name});
-                try watOps(block.ops, indent + 1, writer);
+            .block => |b| {
+                try std.fmt.format(writer, "(block ${s}", .{b.name});
+                try watOps(b.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
             .loop => |l| {
@@ -434,6 +434,14 @@ pub fn loop(name: []const u8, ops: []const Op) Op {
 
 pub fn if_(then: []const Op, else_: []const Op) Op {
     return .{ .if_ = .{ .then = then, .else_ = else_ } };
+}
+
+pub fn block(name: []const u8, ops: []const Op) Op {
+    return .{ .block = .{ .name = name, .ops = ops } };
+}
+
+pub fn when(ops: []const Op) Op {
+    return .{ .if_ = .{ .then = ops } };
 }
 
 pub fn exportFunc(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
