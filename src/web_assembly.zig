@@ -5,7 +5,6 @@
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const str = []const u8;
 
 pub const Type = enum {
     i32,
@@ -15,85 +14,80 @@ pub const Type = enum {
     v128,
 };
 
-pub const Types = []const Type;
-
 pub const Memory = struct {
-    name: str,
+    name: []const u8,
     initial: u32,
     max: ?u32 = null,
 };
 
-pub const Memories = []const Memory;
+pub const Mutable = enum {
+    mutable,
+    immutable,
+};
 
 pub const Import = struct {
-    module: str,
-    name: str,
+    path: [2][]const u8,
     kind: union(enum) {
-        function: struct {
-            name: str,
-            parameters: Types = &.{},
-            results: Types = &.{},
+        func: struct {
+            name: []const u8,
+            params: []const Type = &.{},
+            results: []const Type = &.{},
         },
         global: struct {
-            name: str,
+            name: []const u8,
             type: Type,
-            mutable: bool = false,
+            mut: Mutable = .immutable,
         },
         memory: Memory,
     },
 };
 
-pub const Imports = []const Import;
-
-pub const Global = struct {
-    name: str,
-    value: union(enum) {
-        i32: i32,
-    },
-    mutable: bool = false,
+const Value = union(enum) {
+    i32: i32,
 };
 
-pub const Globals = []const Global;
+pub const Global = struct {
+    name: []const u8,
+    value: Value,
+    mut: Mutable = .immutable,
+};
 
 pub const Data = struct {
     offset: u32,
-    bytes: str,
+    bytes: []const u8,
 };
 
-pub const Datas = []const Data;
-
-pub const Parameter = struct {
-    name: str,
+pub const Param = struct {
+    name: []const u8,
     type: Type,
 };
 
-pub const Parameters = []const Parameter;
-
-pub const Instruction = union(enum) {
-    call: str,
-    local_get: str,
-    local_set: str,
-    local_tee: str,
-    global_get: str,
-    global_set: str,
+pub const Op = union(enum) {
+    call: []const u8,
+    local: struct { name: []const u8, type: Type },
+    local_get: []const u8,
+    local_set: []const u8,
+    local_tee: []const u8,
+    global_get: []const u8,
+    global_set: []const u8,
     i32_add,
     i32_lt_s,
     i32_eq,
     i32_const: i32,
     block: struct {
-        name: str,
-        body: Instructions,
+        name: []const u8,
+        ops: []const Op,
     },
     loop: struct {
-        name: str,
-        body: Instructions,
+        name: []const u8,
+        ops: []const Op,
     },
     if_: struct {
-        then: Instructions,
-        else_: Instructions = &.{},
+        then: []const Op,
+        else_: []const Op = &.{},
     },
-    br: str,
-    br_if: str,
+    br: []const u8,
+    br_if: []const u8,
     unreachable_,
     select,
     nop,
@@ -101,44 +95,35 @@ pub const Instruction = union(enum) {
     drop,
 };
 
-pub const Instructions = []const Instruction;
-
 pub const Local = struct {
-    name: str,
+    name: []const u8,
     type: Type,
 };
 
-pub const Locals = []const Local;
-
-pub const Function = struct {
-    name: str,
-    parameters: Parameters = &.{},
-    results: Types = &.{},
-    locals: Locals = &.{},
-    body: Instructions,
+pub const Func = struct {
+    name: []const u8,
+    params: []const Param = &.{},
+    results: []const Type = &.{},
+    ops: []const Op = &.{},
 };
 
-pub const Functions = []const Function;
-
 pub const Export = struct {
-    name: str,
+    name: []const u8,
     kind: union(enum) {
-        function: str,
-        global: str,
-        memory: str,
+        func: []const u8,
+        global: []const u8,
+        memory: []const u8,
     },
 };
 
-pub const Exports = []const Export;
-
-pub const Module = struct {
-    imports: Imports = &.{},
-    memories: Memories = &.{},
-    globals: Globals = &.{},
-    datas: Datas = &.{},
-    functions: Functions = &.{},
-    exports: Exports = &.{},
-    start: ?str = null,
+pub const TopLevel = union(enum) {
+    import: Import,
+    memory: Memory,
+    global: Global,
+    data: Data,
+    func: Func,
+    export_: Export,
+    start: []const u8,
 };
 
 fn watType(t: Type, writer: anytype) !void {
@@ -151,106 +136,89 @@ fn watType(t: Type, writer: anytype) !void {
     }
 }
 
-fn watImports(imports: Imports, writer: anytype) !void {
-    for (imports) |import| {
-        const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
-        try std.fmt.format(writer, fmt, .{ import.module, import.name });
-        switch (import.kind) {
-            .function => |func| {
-                try std.fmt.format(writer, "(func ${s}", .{func.name});
-                if (func.parameters.len > 0) {
-                    try writer.writeAll(" (param");
-                    for (func.parameters) |param| {
-                        try writer.writeAll(" ");
-                        try watType(param, writer);
-                    }
-                    try writer.writeAll(")");
-                }
-                if (func.results.len > 0) {
-                    try writer.writeAll(" (result");
-                    for (func.results) |result| {
-                        try writer.writeAll(" ");
-                        try watType(result, writer);
-                    }
-                    try writer.writeAll(")");
-                }
-                try writer.writeAll(")");
-            },
-            .global => |global| {
-                try std.fmt.format(writer, "(global ${s}", .{global.name});
-                if (global.mutable) {
-                    try writer.writeAll(" (mut ");
-                    try watType(global.type, writer);
-                    try writer.writeAll(")");
-                } else {
+fn watImport(import: Import, writer: anytype) !void {
+    const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
+    try std.fmt.format(writer, fmt, .{ import.path[0], import.path[1] });
+    switch (import.kind) {
+        .func => |f| {
+            try std.fmt.format(writer, "(func ${s}", .{f.name});
+            if (f.params.len > 0) {
+                try writer.writeAll(" (param");
+                for (f.params) |p| {
                     try writer.writeAll(" ");
-                    try watType(global.type, writer);
+                    try watType(p, writer);
                 }
                 try writer.writeAll(")");
-            },
-            .memory => |memory| {
-                try std.fmt.format(writer, "(memory ${s} {})", .{ memory.name, memory.initial });
-            },
-        }
-        try writer.writeAll(")");
+            }
+            if (f.results.len > 0) {
+                try writer.writeAll(" (result");
+                for (f.results) |result| {
+                    try writer.writeAll(" ");
+                    try watType(result, writer);
+                }
+                try writer.writeAll(")");
+            }
+            try writer.writeAll(")");
+        },
+        .global => |g| {
+            try std.fmt.format(writer, "(global ${s}", .{g.name});
+            if (g.mut == .mutable) {
+                try writer.writeAll(" (mut ");
+                try watType(g.type, writer);
+                try writer.writeAll(")");
+            } else {
+                try writer.writeAll(" ");
+                try watType(g.type, writer);
+            }
+            try writer.writeAll(")");
+        },
+        .memory => |m| {
+            try std.fmt.format(writer, "(memory ${s} {})", .{ m.name, m.initial });
+        },
     }
+    try writer.writeAll(")");
 }
 
-fn watMemories(memories: Memories, writer: anytype) !void {
-    for (memories) |memory| {
-        try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ memory.name, memory.initial });
-    }
+fn watMemory(m: Memory, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ m.name, m.initial });
 }
 
-fn watGlobalType(global: Global, writer: anytype) !void {
-    if (global.mutable) try writer.writeAll("(mut ");
-    switch (global.value) {
+fn watGlobalType(g: Global, writer: anytype) !void {
+    if (g.mut == .mutable) try writer.writeAll("(mut ");
+    switch (g.value) {
         .i32 => try writer.writeAll("i32"),
     }
-    if (global.mutable) try writer.writeAll(")");
+    if (g.mut == .mutable) try writer.writeAll(")");
 }
 
-fn watGlobals(globals: Globals, writer: anytype) !void {
-    for (globals) |global| {
-        try std.fmt.format(writer, "\n\n    (global ${s} ", .{global.name});
-        try watGlobalType(global, writer);
-        switch (global.value) {
-            .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
-        }
+fn watGlobal(g: Global, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (global ${s} ", .{g.name});
+    try watGlobalType(g, writer);
+    switch (g.value) {
+        .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
+    }
+    try writer.writeAll(")");
+}
+
+fn watData(d: Data, writer: anytype) !void {
+    const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
+    try std.fmt.format(writer, fmt, .{ d.offset, d.bytes });
+}
+
+fn watFuncParams(params: []const Param, writer: anytype) !void {
+    for (params) |p| {
+        try std.fmt.format(writer, " (param ${s} ", .{p.name});
+        try watType(p.type, writer);
         try writer.writeAll(")");
     }
 }
 
-fn watDatas(datas: Datas, writer: anytype) !void {
-    for (datas) |data| {
-        const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
-        try std.fmt.format(writer, fmt, .{ data.offset, data.bytes });
-    }
-}
-
-fn watFunctionParameters(parameters: Parameters, writer: anytype) !void {
-    for (parameters) |param| {
-        try std.fmt.format(writer, " (param ${s} ", .{param.name});
-        try watType(param.type, writer);
-        try writer.writeAll(")");
-    }
-}
-
-fn watFunctionResults(results: Types, writer: anytype) !void {
+fn watFuncResults(results: []const Type, writer: anytype) !void {
     for (results) |result| {
         try writer.writeAll(" (result ");
         try watType(result, writer);
         try writer.writeAll(")");
     }
-}
-
-fn watFunctionLocals(locals: Locals, writer: anytype) !void {
-    for (locals) |local| {
-        try std.fmt.format(writer, "\n        (local ${s} ", .{local.name});
-        try watType(local.type, writer);
-        try writer.writeAll(")");
-    }
-    if (locals.len > 0) try writer.writeAll("\n");
 }
 
 fn watIndent(indent: u8, writer: anytype) !void {
@@ -261,11 +229,16 @@ fn watIndent(indent: u8, writer: anytype) !void {
     }
 }
 
-fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !void {
-    for (instructions) |op| {
+fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
+    for (ops) |op| {
         try watIndent(indent, writer);
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
+            .local => |l| {
+                try std.fmt.format(writer, "(local ${s} ", .{l.name});
+                try watType(l.type, writer);
+                try writer.writeAll(")");
+            },
             .local_get => |value| try std.fmt.format(writer, "(local.get ${s})", .{value}),
             .local_set => |value| try std.fmt.format(writer, "(local.set ${s})", .{value}),
             .local_tee => |value| try std.fmt.format(writer, "(local.tee ${s})", .{value}),
@@ -277,24 +250,24 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
             .block => |block| {
                 try std.fmt.format(writer, "(block ${s}", .{block.name});
-                try watInstructions(block.body, indent + 1, writer);
+                try watOps(block.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
             .loop => |loop| {
                 try std.fmt.format(writer, "(loop ${s}", .{loop.name});
-                try watInstructions(loop.body, indent + 1, writer);
+                try watOps(loop.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
             .if_ => |if_| {
                 try writer.writeAll("(if");
                 try watIndent(indent + 1, writer);
                 try writer.writeAll("(then");
-                try watInstructions(if_.then, indent + 2, writer);
+                try watOps(if_.then, indent + 2, writer);
                 try writer.writeAll(")");
                 if (if_.else_.len > 0) {
                     try watIndent(indent + 1, writer);
                     try writer.writeAll("(else");
-                    try watInstructions(if_.else_, indent + 2, writer);
+                    try watOps(if_.else_, indent + 2, writer);
                     try writer.writeAll(")");
                 }
                 try writer.writeAll(")");
@@ -310,49 +283,162 @@ fn watInstructions(instructions: Instructions, indent: u8, writer: anytype) !voi
     }
 }
 
-fn watFunctions(functions: Functions, writer: anytype) !void {
-    for (functions) |func| {
-        try std.fmt.format(writer, "\n\n    (func ${s}", .{func.name});
-        try watFunctionParameters(func.parameters, writer);
-        try watFunctionResults(func.results, writer);
-        try watFunctionLocals(func.locals, writer);
-        try watInstructions(func.body, 2, writer);
-        try writer.writeAll(")");
-    }
-}
-
-fn watExports(exports: Exports, writer: anytype) !void {
-    for (exports) |e| {
-        try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e.name});
-        switch (e.kind) {
-            .function => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
-            .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
-            .memory => |name| try std.fmt.format(writer, "(memory ${s})", .{name}),
-        }
-        try writer.writeAll(")");
-    }
-}
-
-fn watStart(start: ?str, writer: anytype) !void {
-    if (start) |name| {
-        try std.fmt.format(writer, "\n\n    (start ${s})", .{name});
-    }
-}
-
-pub fn wat(module: Module, writer: anytype) !void {
-    try writer.writeAll("(module");
-    try watImports(module.imports, writer);
-    try watMemories(module.memories, writer);
-    try watGlobals(module.globals, writer);
-    try watDatas(module.datas, writer);
-    try watFunctions(module.functions, writer);
-    try watExports(module.exports, writer);
-    try watStart(module.start, writer);
+fn watFunc(f: Func, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (func ${s}", .{f.name});
+    try watFuncParams(f.params, writer);
+    try watFuncResults(f.results, writer);
+    try watOps(f.ops, 2, writer);
     try writer.writeAll(")");
 }
 
-pub fn allocWat(module: Module, allocator: Allocator) !str {
+fn watExport(e: Export, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e.name});
+    switch (e.kind) {
+        .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
+        .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
+        .memory => |name| try std.fmt.format(writer, "(memory ${s})", .{name}),
+    }
+    try writer.writeAll(")");
+}
+
+fn watStart(name: []const u8, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (start ${s})", .{name});
+}
+
+pub fn wat(module: []const TopLevel, writer: anytype) !void {
+    try writer.writeAll("(module");
+    for (module) |top_level| {
+        switch (top_level) {
+            .import => |i| try watImport(i, writer),
+            .memory => |m| try watMemory(m, writer),
+            .global => |g| try watGlobal(g, writer),
+            .data => |d| try watData(d, writer),
+            .func => |f| try watFunc(f, writer),
+            .export_ => |e| try watExport(e, writer),
+            .start => |name| try watStart(name, writer),
+        }
+    }
+    try writer.writeAll(")");
+}
+
+pub fn allocWat(module: []const TopLevel, allocator: Allocator) ![]const u8 {
     var list = std.ArrayList(u8).init(allocator);
     try wat(module, list.writer());
     return list.toOwnedSlice();
+}
+
+pub fn param(name: []const u8, type_: Type) Param {
+    return .{
+        .name = name,
+        .type = type_,
+    };
+}
+
+pub fn global(name: []const u8, value: Value, mut: Mutable) TopLevel {
+    return .{ .global = .{ .name = name, .value = value, .mut = mut } };
+}
+
+pub fn func(
+    name: []const u8,
+    params: []const Param,
+    results: []const Type,
+    ops: []const Op,
+) TopLevel {
+    return .{
+        .func = .{
+            .name = name,
+            .params = params,
+            .results = results,
+            .ops = ops,
+        },
+    };
+}
+
+pub fn importGlobal(
+    path: [2][]const u8,
+    name: []const u8,
+    type_: Type,
+    mut: Mutable,
+) TopLevel {
+    return .{
+        .import = .{
+            .path = path,
+            .kind = .{
+                .global = .{
+                    .name = name,
+                    .type = type_,
+                    .mut = mut,
+                },
+            },
+        },
+    };
+}
+
+pub fn importFunc(
+    path: [2][]const u8,
+    name: []const u8,
+    params: []const Type,
+    results: []const Type,
+) TopLevel {
+    return .{
+        .import = .{
+            .path = path,
+            .kind = .{
+                .func = .{
+                    .name = name,
+                    .params = params,
+                    .results = results,
+                },
+            },
+        },
+    };
+}
+
+pub fn importMemory(
+    path: [2][]const u8,
+    name: []const u8,
+    initial: u8,
+) TopLevel {
+    return .{
+        .import = .{
+            .path = path,
+            .kind = .{
+                .memory = .{
+                    .name = name,
+                    .initial = initial,
+                },
+            },
+        },
+    };
+}
+
+pub fn data(offset: u32, bytes: []const u8) TopLevel {
+    return .{ .data = .{ .offset = offset, .bytes = bytes } };
+}
+
+pub fn memory(name: []const u8, initial: u32) TopLevel {
+    return .{ .memory = .{ .name = name, .initial = initial } };
+}
+
+pub fn start(name: []const u8) TopLevel {
+    return .{ .start = name };
+}
+
+pub fn local(name: []const u8, type_: Type) Op {
+    return .{ .local = .{ .name = name, .type = type_ } };
+}
+
+pub fn exportFunc(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
+    const as = if (config.as.len > 0) config.as else name;
+    return .{ .export_ = .{ .name = as, .kind = .{ .func = name } } };
+}
+
+pub fn exportGlobal(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
+    const as = if (config.as.len > 0) config.as else name;
+    return .{ .export_ = .{ .name = as, .kind = .{ .global = name } } };
+}
+
+pub fn exportMemory(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
+    const as = if (config.as.len > 0) config.as else name;
+    return .{ .export_ = .{ .name = as, .kind = .{ .memory = name } } };
 }

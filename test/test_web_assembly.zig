@@ -1,26 +1,29 @@
 const std = @import("std");
 const fusion = @import("fusion");
-const Module = fusion.web_assembly.Module;
 const allocWat = fusion.web_assembly.allocWat;
+const p = fusion.web_assembly.param;
+const global = fusion.web_assembly.global;
+const func = fusion.web_assembly.func;
+const data = fusion.web_assembly.data;
+const memory = fusion.web_assembly.memory;
+const start = fusion.web_assembly.start;
+const local = fusion.web_assembly.local;
+const Module = fusion.web_assembly.Module;
+const importGlobal = fusion.web_assembly.importGlobal;
+const importFunc = fusion.web_assembly.importFunc;
+const importMemory = fusion.web_assembly.importMemory;
+const exportGlobal = fusion.web_assembly.exportGlobal;
+const exportFunc = fusion.web_assembly.exportFunc;
+const exportMemory = fusion.web_assembly.exportMemory;
 
 test "non exported function" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .functions = &.{
-            .{
-                .name = "add",
-                .parameters = &.{
-                    .{ .name = "lhs", .type = .i32 },
-                    .{ .name = "rhs", .type = .i32 },
-                },
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .local_get = "lhs" },
-                    .{ .local_get = "rhs" },
-                    .i32_add,
-                },
-            },
-        },
+    const module = &.{
+        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
+            .{ .local_get = "lhs" },
+            .{ .local_get = "rhs" },
+            .i32_add,
+        }),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -37,25 +40,13 @@ test "non exported function" {
 
 test "exported function" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .functions = &.{
-            .{
-                .name = "add",
-                .parameters = &.{
-                    .{ .name = "lhs", .type = .i32 },
-                    .{ .name = "rhs", .type = .i32 },
-                },
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .local_get = "lhs" },
-                    .{ .local_get = "rhs" },
-                    .i32_add,
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "add", .kind = .{ .function = "add" } },
-        },
+    const module = &.{
+        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
+            .{ .local_get = "lhs" },
+            .{ .local_get = "rhs" },
+            .i32_add,
+        }),
+        exportFunc("add", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -74,25 +65,13 @@ test "exported function" {
 
 test "exported function with new name" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .functions = &.{
-            .{
-                .name = "add",
-                .parameters = &.{
-                    .{ .name = "lhs", .type = .i32 },
-                    .{ .name = "rhs", .type = .i32 },
-                },
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .local_get = "lhs" },
-                    .{ .local_get = "rhs" },
-                    .i32_add,
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "myAdd", .kind = .{ .function = "add" } },
-        },
+    const module = &.{
+        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
+            .{ .local_get = "lhs" },
+            .{ .local_get = "rhs" },
+            .i32_add,
+        }),
+        exportFunc("add", .{ .as = "myAdd" }),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -111,26 +90,17 @@ test "exported function with new name" {
 
 test "function call" {
     const allocator = std.testing.allocator;
-    const module = Module{ .functions = &.{
-        .{
-            .name = "getAnswer",
-            .results = &.{.i32},
-            .body = &.{
-                .{ .i32_const = 42 },
-            },
-        },
-        .{
-            .name = "getAnswerPlus1",
-            .results = &.{.i32},
-            .body = &.{
-                .{ .call = "getAnswer" },
-                .{ .i32_const = 1 },
-                .i32_add,
-            },
-        },
-    }, .exports = &.{
-        .{ .name = "getAnswerPlus1", .kind = .{ .function = "getAnswerPlus1" } },
-    } };
+    const module = &.{
+        func("getAnswer", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 42 },
+        }),
+        func("getAnswerPlus1", &.{}, &.{.i32}, &.{
+            .{ .call = "getAnswer" },
+            .{ .i32_const = 1 },
+            .i32_add,
+        }),
+        exportFunc("getAnswerPlus1", .{}),
+    };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
     const expected =
@@ -151,28 +121,13 @@ test "function call" {
 
 test "import function" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "logIt",
-                .body = &.{
-                    .{ .i32_const = 13 },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "logIt", .kind = .{ .function = "logIt" } },
-        },
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("logIt", &.{}, &.{}, &.{
+            .{ .i32_const = 13 },
+            .{ .call = "log" },
+        }),
+        exportFunc("logIt", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -192,38 +147,19 @@ test "import function" {
 
 test "import global variable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "js",
-                .name = "global",
-                .kind = .{
-                    .global = .{ .name = "g", .type = .i32, .mutable = true },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "getGlobal",
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .global_get = "g" },
-                },
-            },
-            .{
-                .name = "incGlobal",
-                .body = &.{
-                    .{ .global_get = "g" },
-                    .{ .i32_const = 1 },
-                    .i32_add,
-                    .{ .global_set = "g" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
-        },
+    const module = &.{
+        importGlobal(.{ "js", "global" }, "g", .i32, .mutable),
+        func("getGlobal", &.{}, &.{.i32}, &.{
+            .{ .global_get = "g" },
+        }),
+        func("incGlobal", &.{}, &.{}, &.{
+            .{ .global_get = "g" },
+            .{ .i32_const = 1 },
+            .i32_add,
+            .{ .global_set = "g" },
+        }),
+        exportFunc("getGlobal", .{}),
+        exportFunc("incGlobal", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -250,32 +186,19 @@ test "import global variable" {
 
 test "module only global variable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .globals = &.{
-            .{ .name = "g", .value = .{ .i32 = 42 }, .mutable = true },
-        },
-        .functions = &.{
-            .{
-                .name = "getGlobal",
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .global_get = "g" },
-                },
-            },
-            .{
-                .name = "incGlobal",
-                .body = &.{
-                    .{ .global_get = "g" },
-                    .{ .i32_const = 1 },
-                    .i32_add,
-                    .{ .global_set = "g" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
-        },
+    const module = &.{
+        global("g", .{ .i32 = 42 }, .mutable),
+        func("getGlobal", &.{}, &.{.i32}, &.{
+            .{ .global_get = "g" },
+        }),
+        func("incGlobal", &.{}, &.{}, &.{
+            .{ .global_get = "g" },
+            .{ .i32_const = 1 },
+            .i32_add,
+            .{ .global_set = "g" },
+        }),
+        exportFunc("getGlobal", .{}),
+        exportFunc("incGlobal", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -302,22 +225,12 @@ test "module only global variable" {
 
 test "immutable global variable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .globals = &.{
-            .{ .name = "g", .value = .{ .i32 = 42 } },
-        },
-        .functions = &.{
-            .{
-                .name = "getGlobal",
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .global_get = "g" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
-        },
+    const module = &.{
+        global("g", .{ .i32 = 42 }, .immutable),
+        func("getGlobal", &.{}, &.{.i32}, &.{
+            .{ .global_get = "g" },
+        }),
+        exportFunc("getGlobal", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -336,33 +249,20 @@ test "immutable global variable" {
 
 test "export global variable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .globals = &.{
-            .{ .name = "g", .value = .{ .i32 = 42 }, .mutable = true },
-        },
-        .functions = &.{
-            .{
-                .name = "getGlobal",
-                .results = &.{.i32},
-                .body = &.{
-                    .{ .global_get = "g" },
-                },
-            },
-            .{
-                .name = "incGlobal",
-                .body = &.{
-                    .{ .global_get = "g" },
-                    .{ .i32_const = 1 },
-                    .i32_add,
-                    .{ .global_set = "g" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "getGlobal", .kind = .{ .function = "getGlobal" } },
-            .{ .name = "incGlobal", .kind = .{ .function = "incGlobal" } },
-            .{ .name = "g", .kind = .{ .global = "g" } },
-        },
+    const module = &.{
+        global("g", .{ .i32 = 42 }, .mutable),
+        func("getGlobal", &.{}, &.{.i32}, &.{
+            .{ .global_get = "g" },
+        }),
+        func("incGlobal", &.{}, &.{}, &.{
+            .{ .global_get = "g" },
+            .{ .i32_const = 1 },
+            .i32_add,
+            .{ .global_set = "g" },
+        }),
+        exportFunc("getGlobal", .{}),
+        exportFunc("incGlobal", .{}),
+        exportGlobal("g", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -391,33 +291,16 @@ test "export global variable" {
 
 test "import memory" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "js",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
-                },
-            },
-            .{ .module = "js", .name = "mem", .kind = .{ .memory = .{ .name = "mem", .initial = 1 } } },
-        },
-        .datas = &.{
-            .{ .offset = 0, .bytes = "Hi" },
-        },
-        .functions = &.{
-            .{
-                .name = "writeHi",
-                .body = &.{
-                    .{ .i32_const = 0 },
-                    .{ .i32_const = 2 },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
-        },
+    const module = &.{
+        importFunc(.{ "js", "log" }, "log", &.{ .i32, .i32 }, &.{}),
+        importMemory(.{ "js", "mem" }, "mem", 1),
+        data(0, "Hi"),
+        func("writeHi", &.{}, &.{}, &.{
+            .{ .i32_const = 0 },
+            .{ .i32_const = 2 },
+            .{ .call = "log" },
+        }),
+        exportFunc("writeHi", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -442,35 +325,16 @@ test "import memory" {
 
 test "module only memory" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "js",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
-                },
-            },
-        },
-        .memories = &.{
-            .{ .name = "mem", .initial = 1 },
-        },
-        .datas = &.{
-            .{ .offset = 0, .bytes = "Hi" },
-        },
-        .functions = &.{
-            .{
-                .name = "writeHi",
-                .body = &.{
-                    .{ .i32_const = 0 },
-                    .{ .i32_const = 2 },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
-        },
+    const module = &.{
+        importFunc(.{ "js", "log" }, "log", &.{ .i32, .i32 }, &.{}),
+        memory("mem", 1),
+        data(0, "Hi"),
+        func("writeHi", &.{}, &.{}, &.{
+            .{ .i32_const = 0 },
+            .{ .i32_const = 2 },
+            .{ .call = "log" },
+        }),
+        exportFunc("writeHi", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -495,36 +359,17 @@ test "module only memory" {
 
 test "export memory" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "js",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{ .i32, .i32 } },
-                },
-            },
-        },
-        .memories = &.{
-            .{ .name = "mem", .initial = 1 },
-        },
-        .datas = &.{
-            .{ .offset = 0, .bytes = "Hi" },
-        },
-        .functions = &.{
-            .{
-                .name = "writeHi",
-                .body = &.{
-                    .{ .i32_const = 0 },
-                    .{ .i32_const = 2 },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .exports = &.{
-            .{ .name = "writeHi", .kind = .{ .function = "writeHi" } },
-            .{ .name = "mem", .kind = .{ .memory = "mem" } },
-        },
+    const module = &.{
+        importFunc(.{ "js", "log" }, "log", &.{ .i32, .i32 }, &.{}),
+        memory("mem", 1),
+        data(0, "Hi"),
+        func("writeHi", &.{}, &.{}, &.{
+            .{ .i32_const = 0 },
+            .{ .i32_const = 2 },
+            .{ .call = "log" },
+        }),
+        exportFunc("writeHi", .{}),
+        exportMemory("mem", .{}),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -551,26 +396,13 @@ test "export memory" {
 
 test "start function" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "logIt",
-                .body = &.{
-                    .{ .i32_const = 13 },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "logIt",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("logIt", &.{}, &.{}, &.{
+            .{ .i32_const = 13 },
+            .{ .call = "log" },
+        }),
+        start("logIt"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -590,29 +422,16 @@ test "start function" {
 
 test "local variables" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "main",
-                .locals = &.{.{ .name = "var", .type = .i32 }},
-                .body = &.{
-                    .{ .i32_const = 10 },
-                    .{ .local_set = "var" },
-                    .{ .local_get = "var" },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            local("var", .i32),
+            .{ .i32_const = 10 },
+            .{ .local_set = "var" },
+            .{ .local_get = "var" },
+            .{ .call = "log" },
+        }),
+        start("main"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -623,7 +442,6 @@ test "local variables" {
         \\
         \\    (func $main
         \\        (local $var i32)
-        \\
         \\        (i32.const 10)
         \\        (local.set $var)
         \\        (local.get $var)
@@ -636,28 +454,15 @@ test "local variables" {
 
 test "tee local variable" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "main",
-                .locals = &.{.{ .name = "var", .type = .i32 }},
-                .body = &.{
-                    .{ .i32_const = 10 },
-                    .{ .local_tee = "var" },
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            local("var", .i32),
+            .{ .i32_const = 10 },
+            .{ .local_tee = "var" },
+            .{ .call = "log" },
+        }),
+        start("main"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -668,7 +473,6 @@ test "tee local variable" {
         \\
         \\    (func $main
         \\        (local $var i32)
-        \\
         \\        (i32.const 10)
         \\        (local.tee $var)
         \\        (call $log))
@@ -685,20 +489,18 @@ test "loop" {
             .{
                 .module = "console",
                 .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
             },
         },
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "main",
                 .locals = &.{.{ .name = "i", .type = .i32 }},
-                .body = &.{
+                .ops = &.{
                     .{
                         .loop = .{
                             .name = "my_loop",
-                            .body = &.{
+                            .ops = &.{
                                 // increment i
                                 .{ .local_get = "i" },
                                 .{ .i32_const = 1 },
@@ -754,15 +556,13 @@ test "if then else" {
             .{
                 .module = "console",
                 .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
             },
         },
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "main",
-                .body = &.{
+                .ops = &.{
                     .{ .i32_const = 0 },
                     .{
                         .if_ = .{
@@ -810,20 +610,18 @@ test "block" {
             .{
                 .module = "console",
                 .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
             },
         },
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "log_if_not_100",
-                .parameters = &.{.{ .name = "num", .type = .i32 }},
-                .body = &.{
+                .params = &.{.{ .name = "num", .type = .i32 }},
+                .ops = &.{
                     .{
                         .block = .{
                             .name = "my_block",
-                            .body = &.{
+                            .ops = &.{
                                 .{ .local_get = "num" },
                                 .{ .i32_const = 100 },
                                 .i32_eq,
@@ -843,7 +641,7 @@ test "block" {
             },
         },
         .exports = &.{
-            .{ .name = "log_if_not_100", .kind = .{ .function = "log_if_not_100" } },
+            .{ .name = "log_if_not_100", .kind = .{ .func = "log_if_not_100" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -872,14 +670,14 @@ test "block" {
 test "unreachable" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "throw",
-                .body = &.{.unreachable_},
+                .ops = &.{.unreachable_},
             },
         },
         .exports = &.{
-            .{ .name = "throw", .kind = .{ .function = "throw" } },
+            .{ .name = "throw", .kind = .{ .func = "throw" } },
         },
     };
     var actual = try allocWat(module, allocator);
@@ -902,15 +700,13 @@ test "select" {
             .{
                 .module = "console",
                 .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
             },
         },
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "select_simple",
-                .body = &.{
+                .ops = &.{
                     .{ .i32_const = 10 },
                     .{ .i32_const = 20 },
                     .{ .i32_const = 0 },
@@ -943,10 +739,10 @@ test "select" {
 test "nop" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "do_nothing",
-                .body = &.{.nop},
+                .ops = &.{.nop},
             },
         },
     };
@@ -964,11 +760,11 @@ test "nop" {
 test "return" {
     const allocator = std.testing.allocator;
     const module = Module{
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "get_90",
                 .results = &.{.i32},
-                .body = &.{
+                .ops = &.{
                     .{ .i32_const = 10 },
                     .{ .i32_const = 90 },
                     // return the second value (90); the first is discarded
@@ -997,15 +793,13 @@ test "drop" {
             .{
                 .module = "console",
                 .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
             },
         },
-        .functions = &.{
+        .funcs = &.{
             .{
                 .name = "main",
-                .body = &.{
+                .ops = &.{
                     .{ .i32_const = 10 },
                     .{ .i32_const = 20 },
                     .drop,
