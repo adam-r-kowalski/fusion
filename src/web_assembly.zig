@@ -57,6 +57,23 @@ pub const Data = struct {
     bytes: []const u8,
 };
 
+pub const Table = struct {
+    name: []const u8,
+    initial: u32,
+    max: ?u32 = null,
+};
+
+pub const Elem = struct {
+    offset: u32,
+    name: []const u8,
+};
+
+pub const FuncType = struct {
+    name: []const u8,
+    params: []const Type = &.{},
+    results: []const Type = &.{},
+};
+
 pub const Param = struct {
     name: []const u8,
     type: Type,
@@ -64,6 +81,7 @@ pub const Param = struct {
 
 pub const Op = union(enum) {
     call: []const u8,
+    call_indirect: []const u8,
     local: struct { name: []const u8, type: Type },
     local_get: []const u8,
     local_set: []const u8,
@@ -121,6 +139,9 @@ pub const TopLevel = union(enum) {
     memory: Memory,
     global: Global,
     data: Data,
+    table: Table,
+    elem: Elem,
+    functype: FuncType,
     func: Func,
     export_: Export,
     start: []const u8,
@@ -205,6 +226,38 @@ fn watData(d: Data, writer: anytype) !void {
     try std.fmt.format(writer, fmt, .{ d.offset, d.bytes });
 }
 
+fn watTable(t: Table, writer: anytype) !void {
+    const fmt = "\n\n    (table ${s} {} funcref)";
+    try std.fmt.format(writer, fmt, .{ t.name, t.initial });
+}
+
+fn watElem(e: Elem, writer: anytype) !void {
+    const fmt = "\n\n    (elem (i32.const {}) ${s})";
+    try std.fmt.format(writer, fmt, .{ e.offset, e.name });
+}
+
+fn watFuncType(f: FuncType, writer: anytype) !void {
+    const fmt = "\n\n    (type ${s} (func";
+    try std.fmt.format(writer, fmt, .{f.name});
+    if (f.params.len > 0) {
+        try writer.writeAll(" (param");
+        for (f.params) |p| {
+            try writer.writeAll(" ");
+            try watType(p, writer);
+        }
+        try writer.writeAll(")");
+    }
+    if (f.results.len > 0) {
+        try writer.writeAll(" (result");
+        for (f.results) |result| {
+            try writer.writeAll(" ");
+            try watType(result, writer);
+        }
+        try writer.writeAll(")");
+    }
+    try writer.writeAll("))");
+}
+
 fn watFuncParams(params: []const Param, writer: anytype) !void {
     for (params) |p| {
         try std.fmt.format(writer, " (param ${s} ", .{p.name});
@@ -234,6 +287,7 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
         try watIndent(indent, writer);
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
+            .call_indirect => |value| try std.fmt.format(writer, "(call_indirect (type ${s}))", .{value}),
             .local => |l| {
                 try std.fmt.format(writer, "(local ${s} ", .{l.name});
                 try watType(l.type, writer);
@@ -313,6 +367,9 @@ pub fn wat(module: []const TopLevel, writer: anytype) !void {
             .memory => |m| try watMemory(m, writer),
             .global => |g| try watGlobal(g, writer),
             .data => |d| try watData(d, writer),
+            .table => |t| try watTable(t, writer),
+            .elem => |e| try watElem(e, writer),
+            .functype => |f| try watFuncType(f, writer),
             .func => |f| try watFunc(f, writer),
             .export_ => |e| try watExport(e, writer),
             .start => |name| try watStart(name, writer),
@@ -321,7 +378,7 @@ pub fn wat(module: []const TopLevel, writer: anytype) !void {
     try writer.writeAll(")");
 }
 
-pub fn allocWat(module: []const TopLevel, allocator: Allocator) ![]const u8 {
+pub fn watAlloc(module: []const TopLevel, allocator: Allocator) ![]const u8 {
     var list = std.ArrayList(u8).init(allocator);
     try wat(module, list.writer());
     return list.toOwnedSlice();
@@ -414,6 +471,18 @@ pub fn importMemory(
 
 pub fn data(offset: u32, bytes: []const u8) TopLevel {
     return .{ .data = .{ .offset = offset, .bytes = bytes } };
+}
+
+pub fn table(name: []const u8, initial: u32) TopLevel {
+    return .{ .table = .{ .name = name, .initial = initial } };
+}
+
+pub fn elem(offset: u32, name: []const u8) TopLevel {
+    return .{ .elem = .{ .offset = offset, .name = name } };
+}
+
+pub fn functype(name: []const u8, params: []const Type, results: []const Type) TopLevel {
+    return .{ .functype = .{ .name = name, .params = params, .results = results } };
 }
 
 pub fn memory(name: []const u8, initial: u32) TopLevel {

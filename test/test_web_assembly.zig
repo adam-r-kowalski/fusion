@@ -1,6 +1,6 @@
 const std = @import("std");
 const fusion = @import("fusion");
-const allocWat = fusion.web_assembly.allocWat;
+const watAlloc = fusion.web_assembly.watAlloc;
 const p = fusion.web_assembly.param;
 const global = fusion.web_assembly.global;
 const func = fusion.web_assembly.func;
@@ -12,6 +12,9 @@ const loop = fusion.web_assembly.loop;
 const block = fusion.web_assembly.block;
 const when = fusion.web_assembly.when;
 const if_ = fusion.web_assembly.if_;
+const table = fusion.web_assembly.table;
+const elem = fusion.web_assembly.elem;
+const functype = fusion.web_assembly.functype;
 const Module = fusion.web_assembly.Module;
 const importGlobal = fusion.web_assembly.importGlobal;
 const importFunc = fusion.web_assembly.importFunc;
@@ -29,7 +32,7 @@ test "non exported function" {
             .i32_add,
         }),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -52,7 +55,7 @@ test "exported function" {
         }),
         exportFunc("add", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -77,7 +80,7 @@ test "exported function with new name" {
         }),
         exportFunc("add", .{ .as = "myAdd" }),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -105,7 +108,7 @@ test "function call" {
         }),
         exportFunc("getAnswerPlus1", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -133,7 +136,7 @@ test "import function" {
         }),
         exportFunc("logIt", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -165,7 +168,7 @@ test "import global variable" {
         exportFunc("getGlobal", .{}),
         exportFunc("incGlobal", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -204,7 +207,7 @@ test "module only global variable" {
         exportFunc("getGlobal", .{}),
         exportFunc("incGlobal", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -236,7 +239,7 @@ test "immutable global variable" {
         }),
         exportFunc("getGlobal", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -268,7 +271,7 @@ test "export global variable" {
         exportFunc("incGlobal", .{}),
         exportGlobal("g", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -306,7 +309,7 @@ test "import memory" {
         }),
         exportFunc("writeHi", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -340,7 +343,7 @@ test "module only memory" {
         }),
         exportFunc("writeHi", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -375,7 +378,7 @@ test "export memory" {
         exportFunc("writeHi", .{}),
         exportMemory("mem", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -408,7 +411,7 @@ test "start function" {
         }),
         start("logIt"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -437,7 +440,7 @@ test "local variables" {
         }),
         start("main"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -468,7 +471,7 @@ test "tee local variable" {
         }),
         start("main"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -510,7 +513,7 @@ test "loop" {
         }),
         start("main"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -552,7 +555,7 @@ test "if then else" {
         }),
         start("main"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -592,7 +595,7 @@ test "block" {
         }),
         exportFunc("log_if_not_100", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -623,7 +626,7 @@ test "unreachable" {
         }),
         exportFunc("throw", .{}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -649,7 +652,7 @@ test "select" {
         }),
         start("select_simple"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -673,7 +676,7 @@ test "nop" {
     const module = &.{
         func("do_nothing", &.{}, &.{}, &.{.nop}),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -694,7 +697,7 @@ test "return" {
             .return_,
         }),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -719,7 +722,7 @@ test "drop" {
         }),
         start("main"),
     };
-    var actual = try allocWat(module, allocator);
+    var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
     const expected =
         \\(module
@@ -733,6 +736,50 @@ test "drop" {
         \\        (call $log))
         \\
         \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "tables" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        table("table", 2),
+        func("f", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 42 },
+        }),
+        func("g", &.{}, &.{.i32}, &.{
+            .{ .i32_const = 13 },
+        }),
+        elem(0, "f"),
+        elem(1, "g"),
+        functype("return_i32", &.{}, &.{.i32}),
+        func("callByIndex", &.{p("i", .i32)}, &.{.i32}, &.{
+            .{ .local_get = "i" },
+            .{ .call_indirect = "return_i32" },
+        }),
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (table $table 2 funcref)
+        \\
+        \\    (func $f (result i32)
+        \\        (i32.const 42))
+        \\
+        \\    (func $g (result i32)
+        \\        (i32.const 13))
+        \\
+        \\    (elem (i32.const 0) $f)
+        \\
+        \\    (elem (i32.const 1) $g)
+        \\
+        \\    (type $return_i32 (func (result i32)))
+        \\
+        \\    (func $callByIndex (param $i i32) (result i32)
+        \\        (local.get $i)
+        \\        (call_indirect (type $return_i32))))
     ;
     try std.testing.expectEqualStrings(expected, actual);
 }
