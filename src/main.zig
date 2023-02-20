@@ -8,6 +8,7 @@ const elem = fusion.web_assembly.elem;
 const functype = fusion.web_assembly.functype;
 const p = fusion.web_assembly.param;
 const exportTable = fusion.web_assembly.exportTable;
+const exportFunc = fusion.web_assembly.exportFunc;
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -29,6 +30,7 @@ pub fn main() !void {
             .{ .call_indirect = "return_i32" },
         }),
         exportTable("table", .{}),
+        exportFunc("callByIndex", .{}),
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     defer file.close();
