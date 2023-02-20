@@ -8,6 +8,7 @@ const data = fusion.web_assembly.data;
 const memory = fusion.web_assembly.memory;
 const start = fusion.web_assembly.start;
 const local = fusion.web_assembly.local;
+const loop = fusion.web_assembly.loop;
 const Module = fusion.web_assembly.Module;
 const importGlobal = fusion.web_assembly.importGlobal;
 const importFunc = fusion.web_assembly.importFunc;
@@ -484,43 +485,27 @@ test "tee local variable" {
 
 test "loop" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
-            },
-        },
-        .funcs = &.{
-            .{
-                .name = "main",
-                .locals = &.{.{ .name = "i", .type = .i32 }},
-                .ops = &.{
-                    .{
-                        .loop = .{
-                            .name = "my_loop",
-                            .ops = &.{
-                                // increment i
-                                .{ .local_get = "i" },
-                                .{ .i32_const = 1 },
-                                .i32_add,
-                                .{ .local_set = "i" },
-                                // log i
-                                .{ .local_get = "i" },
-                                .{ .call = "log" },
-                                // if i < 10 then loop
-                                .{ .local_get = "i" },
-                                .{ .i32_const = 10 },
-                                .i32_lt_s,
-                                .{ .br_if = "my_loop" },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            local("i", .i32),
+            loop("my_loop", &.{
+                // increment i
+                .{ .local_get = "i" },
+                .{ .i32_const = 1 },
+                .i32_add,
+                .{ .local_set = "i" },
+                // log i
+                .{ .local_get = "i" },
+                .{ .call = "log" },
+                // if i < 10 then loop
+                .{ .local_get = "i" },
+                .{ .i32_const = 10 },
+                .i32_lt_s,
+                .{ .br_if = "my_loop" },
+            }),
+        }),
+        start("main"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
@@ -531,7 +516,6 @@ test "loop" {
         \\
         \\    (func $main
         \\        (local $i i32)
-        \\
         \\        (loop $my_loop
         \\            (local.get $i)
         \\            (i32.const 1)

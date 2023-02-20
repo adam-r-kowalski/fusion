@@ -253,9 +253,9 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
                 try watOps(block.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
-            .loop => |loop| {
-                try std.fmt.format(writer, "(loop ${s}", .{loop.name});
-                try watOps(loop.ops, indent + 1, writer);
+            .loop => |l| {
+                try std.fmt.format(writer, "(loop ${s}", .{l.name});
+                try watOps(l.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
             .if_ => |if_| {
@@ -426,6 +426,10 @@ pub fn start(name: []const u8) TopLevel {
 
 pub fn local(name: []const u8, type_: Type) Op {
     return .{ .local = .{ .name = name, .type = type_ } };
+}
+
+pub fn loop(name: []const u8, ops: []const Op) Op {
+    return .{ .loop = .{ .name = name, .ops = ops } };
 }
 
 pub fn exportFunc(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {
