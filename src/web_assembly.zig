@@ -258,16 +258,16 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
                 try watOps(l.ops, indent + 1, writer);
                 try writer.writeAll(")");
             },
-            .if_ => |if_| {
+            .if_ => |i| {
                 try writer.writeAll("(if");
                 try watIndent(indent + 1, writer);
                 try writer.writeAll("(then");
-                try watOps(if_.then, indent + 2, writer);
+                try watOps(i.then, indent + 2, writer);
                 try writer.writeAll(")");
-                if (if_.else_.len > 0) {
+                if (i.else_.len > 0) {
                     try watIndent(indent + 1, writer);
                     try writer.writeAll("(else");
-                    try watOps(if_.else_, indent + 2, writer);
+                    try watOps(i.else_, indent + 2, writer);
                     try writer.writeAll(")");
                 }
                 try writer.writeAll(")");
@@ -430,6 +430,10 @@ pub fn local(name: []const u8, type_: Type) Op {
 
 pub fn loop(name: []const u8, ops: []const Op) Op {
     return .{ .loop = .{ .name = name, .ops = ops } };
+}
+
+pub fn if_(then: []const Op, else_: []const Op) Op {
+    return .{ .if_ = .{ .then = then, .else_ = else_ } };
 }
 
 pub fn exportFunc(name: []const u8, config: struct { as: []const u8 = "" }) TopLevel {

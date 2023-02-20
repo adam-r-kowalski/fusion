@@ -9,6 +9,7 @@ const memory = fusion.web_assembly.memory;
 const start = fusion.web_assembly.start;
 const local = fusion.web_assembly.local;
 const loop = fusion.web_assembly.loop;
+const if_ = fusion.web_assembly.if_;
 const Module = fusion.web_assembly.Module;
 const importGlobal = fusion.web_assembly.importGlobal;
 const importFunc = fusion.web_assembly.importFunc;
@@ -535,35 +536,19 @@ test "loop" {
 
 test "if then else" {
     const allocator = std.testing.allocator;
-    const module = Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{ .func = .{ .name = "log", .params = &.{.i32} } },
-            },
-        },
-        .funcs = &.{
-            .{
-                .name = "main",
-                .ops = &.{
-                    .{ .i32_const = 0 },
-                    .{
-                        .if_ = .{
-                            .then = &.{
-                                .{ .i32_const = 1 },
-                                .{ .call = "log" },
-                            },
-                            .else_ = &.{
-                                .{ .i32_const = 0 },
-                                .{ .call = "log" },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            .{ .i32_const = 0 },
+            if_(&.{
+                .{ .i32_const = 1 },
+                .{ .call = "log" },
+            }, &.{
+                .{ .i32_const = 0 },
+                .{ .call = "log" },
+            }),
+        }),
+        start("main"),
     };
     var actual = try allocWat(module, allocator);
     defer allocator.free(actual);
