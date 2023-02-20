@@ -1,32 +1,22 @@
 const std = @import("std");
 const fusion = @import("fusion");
+const importFunc = fusion.web_assembly.importFunc;
+const func = fusion.web_assembly.func;
+const start = fusion.web_assembly.start;
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
-    const module = fusion.web_assembly.Module{
-        .imports = &.{
-            .{
-                .module = "console",
-                .name = "log",
-                .kind = .{
-                    .function = .{ .name = "log", .parameters = &.{.i32} },
-                },
-            },
-        },
-        .functions = &.{
-            .{
-                .name = "main",
-                .body = &.{
-                    .{ .i32_const = 10 },
-                    .{ .i32_const = 20 },
-                    .drop,
-                    .{ .call = "log" },
-                },
-            },
-        },
-        .start = "main",
+    const module = &.{
+        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
+        func("main", &.{}, &.{}, &.{
+            .{ .i32_const = 10 },
+            .{ .i32_const = 20 },
+            .drop,
+            .{ .call = "log" },
+        }),
+        start("main"),
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     try fusion.web_assembly.wat(module, file.writer());
