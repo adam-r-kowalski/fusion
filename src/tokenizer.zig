@@ -24,10 +24,12 @@ pub const Kind = union(enum) {
     and_,
     or_,
     equal_equal,
-    not_equal,
     less_equal,
     greater_equal,
     comma,
+    bang,
+    bang_equal,
+    colon,
 };
 
 pub const Token = struct {
@@ -140,10 +142,6 @@ pub fn equalEqual(start: [2]usize, end: [2]usize) Token {
     return .{ .start = start, .end = end, .kind = .equal_equal };
 }
 
-pub fn notEqual(start: [2]usize, end: [2]usize) Token {
-    return .{ .start = start, .end = end, .kind = .not_equal };
-}
-
 pub fn lessEqual(start: [2]usize, end: [2]usize) Token {
     return .{ .start = start, .end = end, .kind = .less_equal };
 }
@@ -154,6 +152,18 @@ pub fn greaterEqual(start: [2]usize, end: [2]usize) Token {
 
 pub fn comma(start: [2]usize, end: [2]usize) Token {
     return .{ .start = start, .end = end, .kind = .comma };
+}
+
+pub fn bang(start: [2]usize, end: [2]usize) Token {
+    return .{ .start = start, .end = end, .kind = .bang };
+}
+
+pub fn bangEqual(start: [2]usize, end: [2]usize) Token {
+    return .{ .start = start, .end = end, .kind = .bang_equal };
+}
+
+pub fn colon(start: [2]usize, end: [2]usize) Token {
+    return .{ .start = start, .end = end, .kind = .colon };
 }
 
 fn trim(tokens: *Tokens) void {
@@ -187,6 +197,10 @@ fn tokenizeNumber(tokens: *Tokens) Token {
             else => break,
         }
     }
+    if (i > 2 and tokens.source[i - 1] == '.') {
+        i -= 1;
+        decimals -= 1;
+    }
     const value = tokens.source[0..i];
     advance(tokens, i);
     if (value.len == 1) {
@@ -204,21 +218,41 @@ fn tokenizeNumber(tokens: *Tokens) Token {
 
 fn reserved(char: u8) bool {
     return switch (char) {
-        ' ', '\n', '(', ')', '[', ']', '{', '}', ',' => true,
+        ' ',
+        '\n',
+        '(',
+        ')',
+        '[',
+        ']',
+        '{',
+        '}',
+        ',',
+        '+',
+        '-',
+        '/',
+        '*',
+        '<',
+        '>',
+        '.',
+        '!',
+        '=',
+        '&',
+        '^',
+        ':',
+        => true,
         else => false,
     };
 }
 
 fn tokenizeSymbol(tokens: *Tokens) Token {
     const start = tokens.pos;
-    var i: usize = 0;
+    var i: usize = 1;
     while (i < tokens.source.len and !reserved(tokens.source[i])) : (i += 1) {}
     const value = tokens.source[0..i];
     advance(tokens, i);
     if (std.mem.eql(u8, value, "not")) return not(start, tokens.pos);
     if (std.mem.eql(u8, value, "and")) return and_(start, tokens.pos);
     if (std.mem.eql(u8, value, "or")) return or_(start, tokens.pos);
-    if (std.mem.eql(u8, value, "!=")) return notEqual(start, tokens.pos);
     return symbol(start, tokens.pos, value);
 }
 
@@ -258,12 +292,14 @@ pub const Tokens = struct {
             '=' => return tokenizeOneOrTwo(self, .equal, '=', .equal_equal),
             '<' => return tokenizeOneOrTwo(self, .less, '=', .less_equal),
             '>' => return tokenizeOneOrTwo(self, .greater, '=', .greater_equal),
+            '!' => return tokenizeOneOrTwo(self, .bang, '=', .bang_equal),
             '+' => return tokenizeOne(self, .plus),
             '*' => return tokenizeOne(self, .times),
             '/' => return tokenizeOne(self, .div),
             '&' => return tokenizeOne(self, .ampersand),
             '^' => return tokenizeOne(self, .caret),
             ',' => return tokenizeOne(self, .comma),
+            ':' => return tokenizeOne(self, .colon),
             else => return tokenizeSymbol(self),
         }
     }

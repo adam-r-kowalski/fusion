@@ -26,10 +26,12 @@ const not = fusion.tokenizer.not;
 const and_ = fusion.tokenizer.and_;
 const or_ = fusion.tokenizer.or_;
 const equalEqual = fusion.tokenizer.equalEqual;
-const notEqual = fusion.tokenizer.notEqual;
 const lessEqual = fusion.tokenizer.lessEqual;
 const greaterEqual = fusion.tokenizer.greaterEqual;
 const comma = fusion.tokenizer.comma;
+const bang = fusion.tokenizer.bang;
+const bangEqual = fusion.tokenizer.bangEqual;
+const colon = fusion.tokenizer.colon;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
     try std.testing.expectEqual(expected.start, actual.start);
@@ -68,7 +70,7 @@ test "symbols" {
 
 test "numbers" {
     const allocator = std.testing.allocator;
-    const source = "1 42 -9 0 -0 3.14 .25 -.25 1_000 1_000.";
+    const source = "1 42 -9 0 -0 3.14 .25 -.25 1_000";
     var actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
@@ -81,7 +83,6 @@ test "numbers" {
         float(.{ 0, 18 }, .{ 0, 21 }, ".25"),
         float(.{ 0, 22 }, .{ 0, 26 }, "-.25"),
         int(.{ 0, 27 }, .{ 0, 32 }, "1_000"),
-        float(.{ 0, 33 }, .{ 0, 39 }, "1_000."),
     };
     try expectEqualTokens(expected, actual);
 }
@@ -122,7 +123,7 @@ test "operators" {
         and_(.{ 0, 24 }, .{ 0, 27 }),
         or_(.{ 0, 28 }, .{ 0, 30 }),
         equalEqual(.{ 0, 31 }, .{ 0, 33 }),
-        notEqual(.{ 0, 34 }, .{ 0, 36 }),
+        bangEqual(.{ 0, 34 }, .{ 0, 36 }),
         lessEqual(.{ 0, 37 }, .{ 0, 39 }),
         greaterEqual(.{ 0, 40 }, .{ 0, 42 }),
     };
@@ -193,6 +194,37 @@ test "function call" {
         comma(.{ 0, 6 }, .{ 0, 7 }),
         int(.{ 0, 8 }, .{ 0, 10 }, "20"),
         right_paren(.{ 0, 10 }, .{ 0, 11 }),
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "ufcs function call" {
+    const allocator = std.testing.allocator;
+    const source = "10.min(20)";
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        int(.{ 0, 0 }, .{ 0, 2 }, "10"),
+        dot(.{ 0, 2 }, .{ 0, 3 }),
+        symbol(.{ 0, 3 }, .{ 0, 6 }, "min"),
+        left_paren(.{ 0, 6 }, .{ 0, 7 }),
+        int(.{ 0, 7 }, .{ 0, 9 }, "20"),
+        right_paren(.{ 0, 9 }, .{ 0, 10 }),
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "variable with explicit type" {
+    const allocator = std.testing.allocator;
+    const source = "x: i32 = 10";
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
+        colon(.{ 0, 1 }, .{ 0, 2 }),
+        symbol(.{ 0, 3 }, .{ 0, 6 }, "i32"),
+        equal(.{ 0, 7 }, .{ 0, 8 }),
+        int(.{ 0, 9 }, .{ 0, 11 }, "10"),
     };
     try expectEqualTokens(expected, actual);
 }
