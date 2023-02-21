@@ -27,6 +27,7 @@ pub const Kind = union(enum) {
     not_equal,
     less_equal,
     greater_equal,
+    comma,
 };
 
 pub const Token = struct {
@@ -151,6 +152,10 @@ pub fn greaterEqual(start: [2]usize, end: [2]usize) Token {
     return .{ .start = start, .end = end, .kind = .greater_equal };
 }
 
+pub fn comma(start: [2]usize, end: [2]usize) Token {
+    return .{ .start = start, .end = end, .kind = .comma };
+}
+
 fn trim(tokens: *Tokens) void {
     var i: usize = 0;
     while (i < tokens.source.len) : (i += 1) {
@@ -199,7 +204,7 @@ fn tokenizeNumber(tokens: *Tokens) Token {
 
 fn reserved(char: u8) bool {
     return switch (char) {
-        ' ', '\n' => true,
+        ' ', '\n', '(', ')', '[', ']', '{', '}', ',' => true,
         else => false,
     };
 }
@@ -258,6 +263,7 @@ pub const Tokens = struct {
             '/' => return tokenizeOne(self, .div),
             '&' => return tokenizeOne(self, .ampersand),
             '^' => return tokenizeOne(self, .caret),
+            ',' => return tokenizeOne(self, .comma),
             else => return tokenizeSymbol(self),
         }
     }

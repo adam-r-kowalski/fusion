@@ -29,6 +29,7 @@ const equalEqual = fusion.tokenizer.equalEqual;
 const notEqual = fusion.tokenizer.notEqual;
 const lessEqual = fusion.tokenizer.lessEqual;
 const greaterEqual = fusion.tokenizer.greaterEqual;
+const comma = fusion.tokenizer.comma;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
     try std.testing.expectEqual(expected.start, actual.start);
@@ -42,10 +43,12 @@ fn expectEqualToken(expected: Token, actual: Token) !void {
 }
 
 fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
-    try std.testing.expectEqual(expected.len, actual.len);
-    for (expected) |e, i| {
-        try expectEqualToken(e, actual[i]);
+    var i: usize = 0;
+    const max = std.math.min(expected.len, actual.len);
+    while (i < max) : (i += 1) {
+        try expectEqualToken(expected[i], actual[i]);
     }
+    try std.testing.expectEqual(expected.len, actual.len);
 }
 
 test "symbols" {
@@ -174,6 +177,22 @@ test "multi line function" {
         plus(.{ 3, 6 }, .{ 3, 7 }),
         symbol(.{ 3, 8 }, .{ 3, 9 }, "y"),
         right_brace(.{ 4, 0 }, .{ 4, 1 }),
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "function call" {
+    const allocator = std.testing.allocator;
+    const source = "min(10, 20)";
+    var actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        symbol(.{ 0, 0 }, .{ 0, 3 }, "min"),
+        left_paren(.{ 0, 3 }, .{ 0, 4 }),
+        int(.{ 0, 4 }, .{ 0, 6 }, "10"),
+        comma(.{ 0, 6 }, .{ 0, 7 }),
+        int(.{ 0, 8 }, .{ 0, 10 }, "20"),
+        right_paren(.{ 0, 10 }, .{ 0, 11 }),
     };
     try expectEqualTokens(expected, actual);
 }
