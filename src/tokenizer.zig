@@ -1,7 +1,6 @@
 const std = @import("std");
-const isWhitespace = std.ascii.isWhitespace;
 
-pub const Token = union(enum) {
+pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
     float: []const u8,
@@ -26,10 +25,30 @@ pub const Token = union(enum) {
     or_,
 };
 
-fn trim(source: []const u8) []const u8 {
+pub const Token = struct {
+    start: [2]usize,
+    end: [2]usize,
+    kind: Kind,
+};
+
+pub fn symbol(value: []const u8, start: [2]usize, end: [2]usize) Token {
+    return .{
+        .start = start,
+        .end = end,
+        .kind = .{ .symbol = value },
+    };
+}
+
+fn trim(tokens: *Tokens) void {
     var i: usize = 0;
-    while (i < source.len and isWhitespace(source[i])) : (i += 1) {}
-    return source[i..];
+    while (i < tokens.source.len) : (i += 1) {
+        switch (tokens.source[i]) {
+            ' ' => tokens.pos[1] += 1,
+            '\n' => tokens.pos[0] += 1,
+            else => break,
+        }
+    }
+    tokens.source = tokens.source[i..];
 }
 
 fn tokenizeNumber(tokens: *Tokens) Token {
@@ -55,56 +74,60 @@ fn tokenizeNumber(tokens: *Tokens) Token {
     return token;
 }
 
-fn tokenizeSymbol(tokens: *Tokens) Token {
-    var i: usize = 0;
-    while (i < tokens.source.len and !isWhitespace(tokens.source[i])) : (i += 1) {}
-    const value = tokens.source[0..i];
-    tokens.source = tokens.source[i..];
-    if (std.mem.eql(u8, value, "not")) return .not;
-    if (std.mem.eql(u8, value, "and")) return .and_;
-    if (std.mem.eql(u8, value, "or")) return .or_;
-    const token = Token{ .symbol = value };
-    return token;
+fn advance(tokens: *Tokens, columns: usize) void {
+    tokens.source = tokens.source[columns..];
+    tokens.pos[1] += columns;
 }
 
-fn tokenizeOne(tokens: *Tokens, token: Token) Token {
+fn tokenizeSymbol(tokens: *Tokens) Token {
+    const begin = tokens.pos;
+    var i: usize = 0;
+    while (i < tokens.source.len and tokens.source[i] != ' ') : (i += 1) {}
+    const value = tokens.source[0..i];
+    advance(tokens, i);
+    // if (std.mem.eql(u8, value, "not")) return .not;
+    // if (std.mem.eql(u8, value, "and")) return .and_;
+    // if (std.mem.eql(u8, value, "or")) return .or_;
+    return symbol(value, begin, tokens.pos);
+}
+
+fn tokenizeOne(tokens: *Tokens, kind: Kind) Token {
     tokens.source = tokens.source[1..];
-    return token;
+    return .{ .kind = kind, .start = .{ 0, 0 }, .end = .{ 0, 0 } };
 }
 
 pub const Tokens = struct {
     source: []const u8,
+    pos: [2]usize,
 
     const Self = @This();
 
     pub fn next(self: *Self) ?Token {
-        self.source = trim(self.source);
-        if (self.source.len == 0) {
-            return null;
-        }
+        trim(self);
+        if (self.source.len == 0) return null;
         switch (self.source[0]) {
-            '0'...'9', '-', '.' => return tokenizeNumber(self),
-            '[' => return tokenizeOne(self, .left_bracket),
-            ']' => return tokenizeOne(self, .right_bracket),
-            '{' => return tokenizeOne(self, .left_brace),
-            '}' => return tokenizeOne(self, .right_brace),
-            '(' => return tokenizeOne(self, .left_paren),
-            ')' => return tokenizeOne(self, .right_paren),
-            '=' => return tokenizeOne(self, .equal),
-            '<' => return tokenizeOne(self, .less),
-            '>' => return tokenizeOne(self, .greater),
-            '+' => return tokenizeOne(self, .plus),
-            '*' => return tokenizeOne(self, .times),
-            '/' => return tokenizeOne(self, .div),
-            '&' => return tokenizeOne(self, .ampersand),
-            '^' => return tokenizeOne(self, .caret),
+            // '0'...'9', '-', '.' => return tokenizeNumber(self),
+            // '[' => return tokenizeOne(self, .left_bracket),
+            // ']' => return tokenizeOne(self, .right_bracket),
+            // '{' => return tokenizeOne(self, .left_brace),
+            // '}' => return tokenizeOne(self, .right_brace),
+            // '(' => return tokenizeOne(self, .left_paren),
+            // ')' => return tokenizeOne(self, .right_paren),
+            // '=' => return tokenizeOne(self, .equal),
+            // '<' => return tokenizeOne(self, .less),
+            // '>' => return tokenizeOne(self, .greater),
+            // '+' => return tokenizeOne(self, .plus),
+            // '*' => return tokenizeOne(self, .times),
+            // '/' => return tokenizeOne(self, .div),
+            // '&' => return tokenizeOne(self, .ampersand),
+            // '^' => return tokenizeOne(self, .caret),
             else => return tokenizeSymbol(self),
         }
     }
 };
 
 pub fn tokenize(source: []const u8) Tokens {
-    return .{ .source = source };
+    return .{ .source = source, .pos = .{ 0, 0 } };
 }
 
 pub fn tokenizeAlloc(source: []const u8, allocator: std.mem.Allocator) ![]Token {

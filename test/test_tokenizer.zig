@@ -3,12 +3,15 @@ const fusion = @import("fusion");
 const tokenize = fusion.tokenizer.tokenize;
 const tokenizeAlloc = fusion.tokenizer.tokenizeAlloc;
 const Token = fusion.tokenizer.Token;
+const symbol = fusion.tokenizer.symbol;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
-    switch (expected) {
-        .symbol => try std.testing.expectEqualStrings(expected.symbol, actual.symbol),
-        .int => try std.testing.expectEqualStrings(expected.int, actual.int),
-        .float => try std.testing.expectEqualStrings(expected.float, actual.float),
+    try std.testing.expectEqual(expected.start, actual.start);
+    try std.testing.expectEqual(expected.end, actual.end);
+    switch (expected.kind) {
+        .symbol => |s| try std.testing.expectEqualStrings(s, actual.kind.symbol),
+        .int => |i| try std.testing.expectEqualStrings(i, actual.kind.int),
+        .float => |f| try std.testing.expectEqualStrings(f, actual.kind.float),
         else => try std.testing.expectEqual(expected, actual),
     }
 }
@@ -26,11 +29,11 @@ test "symbols" {
     var actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{ .symbol = "text" },
-        .{ .symbol = "camelCase" },
-        .{ .symbol = "snake_case" },
-        .{ .symbol = "PascalCase" },
-        .{ .symbol = "😀" },
+        symbol("text", .{ 0, 0 }, .{ 0, 4 }),
+        symbol("camelCase", .{ 0, 5 }, .{ 0, 14 }),
+        symbol("snake_case", .{ 0, 15 }, .{ 0, 25 }),
+        symbol("PascalCase", .{ 0, 26 }, .{ 0, 36 }),
+        symbol("😀", .{ 0, 37 }, .{ 0, 41 }),
     };
     try expectEqualTokens(expected, actual);
 }
