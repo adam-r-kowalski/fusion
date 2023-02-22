@@ -39,27 +39,15 @@ pub const Token = struct {
 };
 
 pub fn symbol(start: [2]usize, end: [2]usize, value: []const u8) Token {
-    return .{
-        .start = start,
-        .end = end,
-        .kind = .{ .symbol = value },
-    };
+    return .{ .start = start, .end = end, .kind = .{ .symbol = value } };
 }
 
 pub fn int(start: [2]usize, end: [2]usize, value: []const u8) Token {
-    return .{
-        .start = start,
-        .end = end,
-        .kind = .{ .int = value },
-    };
+    return .{ .start = start, .end = end, .kind = .{ .int = value } };
 }
 
 pub fn float(start: [2]usize, end: [2]usize, value: []const u8) Token {
-    return .{
-        .start = start,
-        .end = end,
-        .kind = .{ .float = value },
-    };
+    return .{ .start = start, .end = end, .kind = .{ .float = value } };
 }
 
 pub fn left_bracket(start: [2]usize, end: [2]usize) Token {

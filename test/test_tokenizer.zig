@@ -34,14 +34,14 @@ const bangEqual = fusion.tokenizer.bangEqual;
 const colon = fusion.tokenizer.colon;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
-    try std.testing.expectEqual(expected.start, actual.start);
-    try std.testing.expectEqual(expected.end, actual.end);
     switch (expected.kind) {
         .symbol => |s| try std.testing.expectEqualStrings(s, actual.kind.symbol),
         .int => |i| try std.testing.expectEqualStrings(i, actual.kind.int),
         .float => |f| try std.testing.expectEqualStrings(f, actual.kind.float),
         else => try std.testing.expectEqual(expected, actual),
     }
+    try std.testing.expectEqual(expected.start, actual.start);
+    try std.testing.expectEqual(expected.end, actual.end);
 }
 
 fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
@@ -56,7 +56,7 @@ fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
 test "symbols" {
     const allocator = std.testing.allocator;
     const source = "text camelCase snake_case PascalCase 😀";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         symbol(.{ 0, 0 }, .{ 0, 4 }, "text"),
@@ -71,7 +71,7 @@ test "symbols" {
 test "numbers" {
     const allocator = std.testing.allocator;
     const source = "1 42 -9 0 -0 3.14 .25 -.25 1_000";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         int(.{ 0, 0 }, .{ 0, 1 }, "1"),
@@ -90,7 +90,7 @@ test "numbers" {
 test "braces brackets and parens" {
     const allocator = std.testing.allocator;
     const source = "[{()}]";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         left_bracket(.{ 0, 0 }, .{ 0, 1 }),
@@ -106,7 +106,7 @@ test "braces brackets and parens" {
 test "operators" {
     const allocator = std.testing.allocator;
     const source = "= < > + - * / . & ^ not and or == != <= >=";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         equal(.{ 0, 0 }, .{ 0, 1 }),
@@ -137,7 +137,7 @@ test "function" {
         \\    42
         \\}
     ;
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         symbol(.{ 0, 0 }, .{ 0, 4 }, "main"),
@@ -160,7 +160,7 @@ test "multi line function" {
         \\    x + y
         \\}
     ;
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         symbol(.{ 0, 0 }, .{ 0, 4 }, "main"),
@@ -185,7 +185,7 @@ test "multi line function" {
 test "function call" {
     const allocator = std.testing.allocator;
     const source = "min(10, 20)";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         symbol(.{ 0, 0 }, .{ 0, 3 }, "min"),
@@ -201,7 +201,7 @@ test "function call" {
 test "ufcs function call" {
     const allocator = std.testing.allocator;
     const source = "10.min(20)";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         int(.{ 0, 0 }, .{ 0, 2 }, "10"),
@@ -217,7 +217,7 @@ test "ufcs function call" {
 test "variable with explicit type" {
     const allocator = std.testing.allocator;
     const source = "x: i32 = 10";
-    var actual = try tokenizeAlloc(source, allocator);
+    const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
         symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
