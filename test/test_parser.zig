@@ -3,6 +3,7 @@ const fusion = @import("fusion");
 const tokenize = fusion.tokenizer.tokenize;
 const parse = fusion.parser.parse;
 const Expression = fusion.parser.Expression;
+const Ast = fusion.parser.Ast;
 const symbol = fusion.parser.symbol;
 const int = fusion.parser.int;
 const binaryOp = fusion.parser.binaryOp;
@@ -28,6 +29,62 @@ fn expectEqualExpressions(expected: []const Expression, actual: []const Expressi
         try expectEqualExpression(expected[i], actual[i]);
     }
     try std.testing.expectEqual(expected.len, actual.len);
+}
+
+fn writeIndent(writer: anytype, indent: usize) !void {
+    try writer.writeAll("\n");
+    var i: usize = 0;
+    while (i < indent) : (i += 1) {
+        try writer.writeAll("    ");
+    }
+}
+
+fn writePosition(writer: anytype, expression: Expression) !void {
+    try std.fmt.format(writer, ".{{ {}, {} }}, .{{ {}, {} }}", .{
+        expression.start[0],
+        expression.start[1],
+        expression.end[0],
+        expression.end[1],
+    });
+}
+
+fn writeExpression(writer: anytype, expression: Expression, indent: usize) !void {
+    try writeIndent(writer, indent);
+    switch (expression.kind) {
+        .symbol => |s| {
+            try writer.writeAll("symbol(");
+            try writePosition(writer, expression);
+            try std.fmt.format(writer, ", \"{s}\")", .{s});
+        },
+        .int => |i| {
+            try writer.writeAll("int(");
+            try writePosition(writer, expression);
+            try std.fmt.format(writer, ", \"{s}\")", .{i});
+        },
+        .binaryOp => |b| {
+            try writer.writeAll("binaryOp(");
+            try writePosition(writer, expression);
+            try std.fmt.format(writer, " {}, &.{{", .{b.op});
+            for (b.args) |arg| {
+                try writeExpression(writer, arg, indent + 1);
+            }
+            try writeIndent(writer, indent);
+            try writer.writeAll("}})");
+        },
+    }
+}
+
+fn writeAst(writer: anytype, ast: Ast) !void {
+    try writer.writeAll("\n\n");
+    for (ast.expressions) |expr| {
+        try writeExpression(writer, expr, 0);
+    }
+    try writer.writeAll("\n\n");
+}
+
+fn printAst(ast: Ast) !void {
+    const writer = std.io.getStdOut().writer();
+    try writeAst(writer, ast);
 }
 
 test "symbol" {

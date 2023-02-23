@@ -61,14 +61,17 @@ pub fn binaryOp(
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
     var arena = Arena.init(allocator);
     var expressions = std.ArrayList(Expression).init(arena.allocator());
-    const expression = parseExpression(tokens);
+    const expression = try parseExpression(arena.allocator(), tokens);
     try expressions.append(expression);
     return .{ .arena = arena, .expressions = expressions.toOwnedSlice() };
 }
 
-fn parseExpression(tokens: *Tokens) Expression {
+fn parseExpression(allocator: Allocator, tokens: *Tokens) error{OutOfMemory}!Expression {
     const token = tokens.next().?;
-    const left = prefixParser(token);
+    var left = prefixParser(token);
+    if (infixParser(tokens)) |parser| {
+        left = try runParser(parser, allocator, tokens, left);
+    }
     return left;
 }
 
@@ -77,5 +80,33 @@ fn prefixParser(token: Token) Expression {
         .symbol => |value| return symbol(token.start, token.end, value),
         .int => |value| return int(token.start, token.end, value),
         else => unreachable,
+    }
+}
+
+const InfixParser = union(enum) {
+    binaryOp: BinaryOp,
+};
+
+fn infixParser(tokens: *Tokens) ?InfixParser {
+    if (tokens.peek()) |token| {
+        switch (token.kind) {
+            .plus => return .{ .binaryOp = BinaryOp.add },
+            else => return null,
+        }
+    } else {
+        return null;
+    }
+}
+
+fn runParser(parser: InfixParser, allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
+    const infix = tokens.next().?;
+    switch (parser) {
+        .binaryOp => |value| {
+            const right = try parseExpression(allocator, tokens);
+            const args = try allocator.alloc(Expression, 2);
+            args[0] = left;
+            args[1] = right;
+            return binaryOp(infix.start, infix.end, value, args);
+        },
     }
 }
