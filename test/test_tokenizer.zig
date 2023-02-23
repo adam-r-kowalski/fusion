@@ -228,3 +228,23 @@ test "variable with explicit type" {
     };
     try expectEqualTokens(expected, actual);
 }
+
+test "next and peek" {
+    const source = "x + y";
+    var tokens = tokenize(source);
+    const x = symbol(.{ 0, 0 }, .{ 0, 1 }, "x");
+    const p = plus(.{ 0, 2 }, .{ 0, 3 });
+    const y = symbol(.{ 0, 4 }, .{ 0, 5 }, "y");
+    try expectEqualToken(tokens.peek().?, x);
+    try expectEqualToken(tokens.peek().?, x);
+    try expectEqualToken(tokens.next().?, x);
+    try expectEqualToken(tokens.peek().?, p);
+    try expectEqualToken(tokens.peek().?, p);
+    try expectEqualToken(tokens.next().?, p);
+    try expectEqualToken(tokens.peek().?, y);
+    try expectEqualToken(tokens.peek().?, y);
+    try expectEqualToken(tokens.next().?, y);
+    try std.testing.expectEqual(tokens.peek(), null);
+    try std.testing.expectEqual(tokens.peek(), null);
+    try std.testing.expectEqual(tokens.next(), null);
+}

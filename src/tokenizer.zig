@@ -262,11 +262,24 @@ fn tokenizeOneOrTwo(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind) Token 
 
 pub const Tokens = struct {
     source: []const u8,
-    pos: [2]usize,
+    pos: [2]usize = .{ 0, 0 },
+    peeked: ?Token = null,
 
     const Self = @This();
 
     pub fn next(self: *Self) ?Token {
+        const token = self.peek();
+        self.peeked = null;
+        return token;
+    }
+
+    pub fn peek(self: *Self) ?Token {
+        if (self.peeked) |token| return token;
+        self.peeked = self.getToken();
+        return self.peeked;
+    }
+
+    fn getToken(self: *Self) ?Token {
         trim(self);
         if (self.source.len == 0) return null;
         switch (self.source[0]) {
@@ -294,7 +307,7 @@ pub const Tokens = struct {
 };
 
 pub fn tokenize(source: []const u8) Tokens {
-    return .{ .source = source, .pos = .{ 0, 0 } };
+    return .{ .source = source };
 }
 
 pub fn tokenizeAlloc(source: []const u8, allocator: std.mem.Allocator) ![]Token {

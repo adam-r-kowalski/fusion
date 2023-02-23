@@ -7,9 +7,17 @@ const Tokens = tokenizer.Tokens;
 const Token = tokenizer.Token;
 const Position = tokenizer.Position;
 
+const BinaryOp = enum {
+    add,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
+    binaryOp: struct {
+        op: BinaryOp,
+        args: []const Expression,
+    },
 };
 
 pub const Expression = struct {
@@ -33,6 +41,21 @@ pub fn symbol(start: [2]usize, end: [2]usize, value: []const u8) Expression {
 
 pub fn int(start: [2]usize, end: [2]usize, value: []const u8) Expression {
     return .{ .start = start, .end = end, .kind = .{ .int = value } };
+}
+
+pub fn binaryOp(
+    start: [2]usize,
+    end: [2]usize,
+    op: BinaryOp,
+    args: []const Expression,
+) Expression {
+    return .{
+        .start = start,
+        .end = end,
+        .kind = .{
+            .binaryOp = .{ .op = op, .args = args },
+        },
+    };
 }
 
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
