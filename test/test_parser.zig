@@ -18,9 +18,13 @@ fn expectEqualExpression(expected: Expression, actual: Expression) error{TestExp
             try std.testing.expectEqual(e.op, a.op);
             try expectEqualExpressions(e.args, a.args);
         },
+        .call => |c| {
+            const a = actual.kind.call;
+            try expectEqualExpression(c.func.*, a.func.*);
+            try expectEqualExpressions(c.args, a.args);
+        },
     }
-    try std.testing.expectEqual(expected.start, actual.start);
-    try std.testing.expectEqual(expected.end, actual.end);
+    try std.testing.expectEqual(expected.span, actual.span);
 }
 
 fn expectEqualExpressions(expected: []const Expression, actual: []const Expression) !void {
@@ -166,6 +170,38 @@ test "operator precedence higher first" {
             }),
             int(.{ 0, 8 }, .{ 0, 9 }, "5"),
         }),
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "function call" {
+    const allocator = std.testing.allocator;
+    const source = "min(10, 20)";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 11 } },
+            .kind = .{
+                .call = .{
+                    .func = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
+                        .kind = .{ .symbol = "min" },
+                    },
+                    .args = &.{
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
+                            .kind = .{ .int = "10" },
+                        },
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
+                            .kind = .{ .int = "20" },
+                        },
+                    },
+                },
+            },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }

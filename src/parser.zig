@@ -5,7 +5,6 @@ const Arena = std.heap.ArenaAllocator;
 const tokenizer = @import("./tokenizer.zig");
 const Tokens = tokenizer.Tokens;
 const Token = tokenizer.Token;
-const Position = tokenizer.Position;
 
 pub const BinaryOp = enum {
     add,
@@ -19,11 +18,24 @@ pub const Kind = union(enum) {
         op: BinaryOp,
         args: []const Expression,
     },
+    call: struct {
+        func: *const Expression,
+        args: []const Expression,
+    },
+};
+
+const Position = struct {
+    line: usize,
+    col: usize,
+};
+
+const Span = struct {
+    begin: Position,
+    end: Position,
 };
 
 pub const Expression = struct {
-    start: [2]usize,
-    end: [2]usize,
+    span: Span,
     kind: Kind,
 };
 
@@ -37,11 +49,23 @@ pub const Ast = struct {
 };
 
 pub fn symbol(start: [2]usize, end: [2]usize, value: []const u8) Expression {
-    return .{ .start = start, .end = end, .kind = .{ .symbol = value } };
+    return .{
+        .span = .{
+            .begin = .{ .line = start[0], .col = start[1] },
+            .end = .{ .line = end[0], .col = end[1] },
+        },
+        .kind = .{ .symbol = value },
+    };
 }
 
 pub fn int(start: [2]usize, end: [2]usize, value: []const u8) Expression {
-    return .{ .start = start, .end = end, .kind = .{ .int = value } };
+    return .{
+        .span = .{
+            .begin = .{ .line = start[0], .col = start[1] },
+            .end = .{ .line = end[0], .col = end[1] },
+        },
+        .kind = .{ .int = value },
+    };
 }
 
 pub fn binaryOp(
@@ -51,8 +75,10 @@ pub fn binaryOp(
     args: []const Expression,
 ) Expression {
     return .{
-        .start = start,
-        .end = end,
+        .span = .{
+            .begin = .{ .line = start[0], .col = start[1] },
+            .end = .{ .line = end[0], .col = end[1] },
+        },
         .kind = .{
             .binaryOp = .{ .op = op, .args = args },
         },
@@ -88,24 +114,70 @@ fn prefixParser(token: Token) Expression {
     switch (token.kind) {
         .symbol => |value| return symbol(token.start, token.end, value),
         .int => |value| return int(token.start, token.end, value),
-        else => unreachable,
+        else => |kind| {
+            std.debug.print("\nno prefix parser for {}!", .{kind});
+            unreachable;
+        },
     }
 }
 
 const InfixParser = union(enum) {
     binaryOp: BinaryOp,
+    call,
 };
 
 fn infixParser(tokens: *Tokens) ?InfixParser {
     if (tokens.peek()) |token| {
         switch (token.kind) {
-            .plus => return .{ .binaryOp = BinaryOp.add },
-            .times => return .{ .binaryOp = BinaryOp.mul },
-            else => unreachable,
+            .plus => return .{ .binaryOp = .add },
+            .times => return .{ .binaryOp = .mul },
+            .left_paren => return .call,
+            else => return null,
         }
     } else {
         return null;
     }
+}
+
+fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, value: BinaryOp, precedence: u8) !Expression {
+    const infix = tokens.next().?;
+    const right = try parseExpression(allocator, tokens, precedence);
+    const args = try allocator.alloc(Expression, 2);
+    args[0] = left;
+    args[1] = right;
+    return binaryOp(infix.start, infix.end, value, args);
+}
+
+fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
+    const left_paren = tokens.next().?;
+    var arguments = std.ArrayList(Expression).init(allocator);
+    while (tokens.peek()) |token| {
+        switch (token.kind) {
+            .right_paren => {
+                _ = tokens.next();
+                const func = try allocator.create(Expression);
+                func.* = left;
+                return .{
+                    .span = .{
+                        .begin = .{ .line = left_paren.start[0], .col = left_paren.start[1] },
+                        .end = .{ .line = token.end[0], .col = token.end[1] },
+                    },
+                    .kind = .{
+                        .call = .{
+                            .func = func,
+                            .args = arguments.toOwnedSlice(),
+                        },
+                    },
+                };
+            },
+            .comma => _ = tokens.next(),
+            else => {
+                const argument = try parseExpression(allocator, tokens, 0);
+                try arguments.append(argument);
+            },
+        }
+    }
+    unreachable;
 }
 
 fn runParser(
@@ -115,25 +187,24 @@ fn runParser(
     left: Expression,
     precedence: u8,
 ) !Expression {
-    const infix = tokens.next().?;
     switch (parser) {
-        .binaryOp => |value| {
-            const right = try parseExpression(allocator, tokens, precedence);
-            const args = try allocator.alloc(Expression, 2);
-            args[0] = left;
-            args[1] = right;
-            return binaryOp(infix.start, infix.end, value, args);
-        },
+        .binaryOp => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
+        .call => return parseCall(allocator, tokens, left),
     }
 }
+
+const ADD = 1;
+const MUL = ADD + 1;
+const CALL = MUL + 1;
 
 fn parserPrecedence(parser: InfixParser) u8 {
     switch (parser) {
         .binaryOp => |op| {
             switch (op) {
-                .add => return 1,
-                .mul => return 2,
+                .add => return ADD,
+                .mul => return MUL,
             }
         },
+        .call => return CALL,
     }
 }
