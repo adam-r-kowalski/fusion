@@ -40,8 +40,7 @@ fn expectEqualToken(expected: Token, actual: Token) !void {
         .float => |f| try std.testing.expectEqualStrings(f, actual.kind.float),
         else => try std.testing.expectEqual(expected, actual),
     }
-    try std.testing.expectEqual(expected.start, actual.start);
-    try std.testing.expectEqual(expected.end, actual.end);
+    try std.testing.expectEqual(expected.span, actual.span);
 }
 
 fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
@@ -59,11 +58,26 @@ test "symbols" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        symbol(.{ 0, 0 }, .{ 0, 4 }, "text"),
-        symbol(.{ 0, 5 }, .{ 0, 14 }, "camelCase"),
-        symbol(.{ 0, 15 }, .{ 0, 25 }, "snake_case"),
-        symbol(.{ 0, 26 }, .{ 0, 36 }, "PascalCase"),
-        symbol(.{ 0, 37 }, .{ 0, 41 }, "😀"),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
+            .kind = .{ .symbol = "text" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 14 } },
+            .kind = .{ .symbol = "camelCase" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 15 }, .end = .{ .line = 0, .col = 25 } },
+            .kind = .{ .symbol = "snake_case" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 26 }, .end = .{ .line = 0, .col = 36 } },
+            .kind = .{ .symbol = "PascalCase" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 37 }, .end = .{ .line = 0, .col = 41 } },
+            .kind = .{ .symbol = "😀" },
+        },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -74,15 +88,42 @@ test "numbers" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        int(.{ 0, 0 }, .{ 0, 1 }, "1"),
-        int(.{ 0, 2 }, .{ 0, 4 }, "42"),
-        int(.{ 0, 5 }, .{ 0, 7 }, "-9"),
-        int(.{ 0, 8 }, .{ 0, 9 }, "0"),
-        int(.{ 0, 10 }, .{ 0, 12 }, "-0"),
-        float(.{ 0, 13 }, .{ 0, 17 }, "3.14"),
-        float(.{ 0, 18 }, .{ 0, 21 }, ".25"),
-        float(.{ 0, 22 }, .{ 0, 26 }, "-.25"),
-        int(.{ 0, 27 }, .{ 0, 32 }, "1_000"),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+            .kind = .{ .int = "1" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 4 } },
+            .kind = .{ .int = "42" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 7 } },
+            .kind = .{ .int = "-9" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
+            .kind = .{ .int = "0" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 12 } },
+            .kind = .{ .int = "-0" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 13 }, .end = .{ .line = 0, .col = 17 } },
+            .kind = .{ .float = "3.14" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 18 }, .end = .{ .line = 0, .col = 21 } },
+            .kind = .{ .float = ".25" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 22 }, .end = .{ .line = 0, .col = 26 } },
+            .kind = .{ .float = "-.25" },
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 27 }, .end = .{ .line = 0, .col = 32 } },
+            .kind = .{ .int = "1_000" },
+        },
     };
     try expectEqualTokens(expected, actual);
 }

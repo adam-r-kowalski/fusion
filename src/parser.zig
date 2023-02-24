@@ -5,6 +5,8 @@ const Arena = std.heap.ArenaAllocator;
 const tokenizer = @import("./tokenizer.zig");
 const Tokens = tokenizer.Tokens;
 const Token = tokenizer.Token;
+const Position = tokenizer.Position;
+const Span = tokenizer.Span;
 
 pub const BinaryOp = enum {
     add,
@@ -22,16 +24,6 @@ pub const Kind = union(enum) {
         func: *const Expression,
         args: []const Expression,
     },
-};
-
-const Position = struct {
-    line: usize,
-    col: usize,
-};
-
-const Span = struct {
-    begin: Position,
-    end: Position,
 };
 
 pub const Expression = struct {
