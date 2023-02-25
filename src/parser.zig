@@ -11,14 +11,16 @@ const Span = tokenizer.Span;
 pub const BinaryOp = enum {
     add,
     mul,
+    assign,
 };
 
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
-    binaryOp: struct {
+    binary_op: struct {
         op: BinaryOp,
-        args: []const Expression,
+        lhs: *const Expression,
+        rhs: *const Expression,
     },
     call: struct {
         func: *const Expression,
@@ -77,15 +79,16 @@ fn prefixParser(token: Token) Expression {
 }
 
 const InfixParser = union(enum) {
-    binaryOp: BinaryOp,
+    binary_op: BinaryOp,
     call,
 };
 
 fn infixParser(tokens: *Tokens) ?InfixParser {
     if (tokens.peek()) |token| {
         switch (token.kind) {
-            .plus => return .{ .binaryOp = .add },
-            .times => return .{ .binaryOp = .mul },
+            .plus => return .{ .binary_op = .add },
+            .times => return .{ .binary_op = .mul },
+            .equal => return .{ .binary_op = .assign },
             .left_paren => return .call,
             else => return null,
         }
@@ -96,11 +99,13 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
 
 fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, value: BinaryOp, precedence: u8) !Expression {
     const infix = tokens.next().?;
-    const right = try parseExpression(allocator, tokens, precedence);
-    const args = try allocator.dupe(Expression, &.{ left, right });
+    const lhs = try allocator.create(Expression);
+    lhs.* = left;
+    const rhs = try allocator.create(Expression);
+    rhs.* = try parseExpression(allocator, tokens, precedence);
     return .{
         .span = infix.span,
-        .kind = .{ .binaryOp = .{ .op = value, .args = args } },
+        .kind = .{ .binary_op = .{ .op = value, .lhs = lhs, .rhs = rhs } },
     };
 }
 
@@ -141,21 +146,23 @@ fn runParser(
     precedence: u8,
 ) !Expression {
     switch (parser) {
-        .binaryOp => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
+        .binary_op => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
         .call => return parseCall(allocator, tokens, left),
     }
 }
 
-const ADD = 1;
+const ASSIGN = 0;
+const ADD = ASSIGN + 1;
 const MUL = ADD + 1;
 const CALL = MUL + 1;
 
 fn parserPrecedence(parser: InfixParser) u8 {
     switch (parser) {
-        .binaryOp => |op| {
+        .binary_op => |op| {
             switch (op) {
                 .add => return ADD,
                 .mul => return MUL,
+                .assign => return ASSIGN,
             }
         },
         .call => return CALL,

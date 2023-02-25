@@ -10,10 +10,11 @@ fn expectEqualExpression(expected: Expression, actual: Expression) error{TestExp
     switch (expected.kind) {
         .symbol => |e| try std.testing.expectEqualStrings(e, actual.kind.symbol),
         .int => |e| try std.testing.expectEqualStrings(e, actual.kind.int),
-        .binaryOp => |e| {
-            const a = actual.kind.binaryOp;
+        .binary_op => |e| {
+            const a = actual.kind.binary_op;
             try std.testing.expectEqual(e.op, a.op);
-            try expectEqualExpressions(e.args, a.args);
+            try expectEqualExpression(e.lhs.*, a.lhs.*);
+            try expectEqualExpression(e.rhs.*, a.rhs.*);
         },
         .call => |c| {
             const a = actual.kind.call;
@@ -136,17 +137,15 @@ test "add two symbols" {
         .{
             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
             .kind = .{
-                .binaryOp = .{
+                .binary_op = .{
                     .op = .add,
-                    .args = &.{
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-                            .kind = .{ .symbol = "x" },
-                        },
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-                            .kind = .{ .symbol = "y" },
-                        },
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                        .kind = .{ .symbol = "x" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                        .kind = .{ .symbol = "y" },
                     },
                 },
             },
@@ -165,28 +164,24 @@ test "operator precedence lower first" {
         .{
             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
             .kind = .{
-                .binaryOp = .{
+                .binary_op = .{
                     .op = .add,
-                    .args = &.{
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-                            .kind = .{ .symbol = "x" },
-                        },
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-                            .kind = .{
-                                .binaryOp = .{
-                                    .op = .mul,
-                                    .args = &.{
-                                        .{
-                                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-                                            .kind = .{ .symbol = "y" },
-                                        },
-                                        .{
-                                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-                                            .kind = .{ .int = "5" },
-                                        },
-                                    },
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                        .kind = .{ .symbol = "x" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .op = .mul,
+                                .lhs = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                                    .kind = .{ .symbol = "y" },
+                                },
+                                .rhs = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
+                                    .kind = .{ .int = "5" },
                                 },
                             },
                         },
@@ -208,31 +203,27 @@ test "operator precedence higher first" {
         .{
             .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
             .kind = .{
-                .binaryOp = .{
+                .binary_op = .{
                     .op = .add,
-                    .args = &.{
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-                            .kind = .{
-                                .binaryOp = .{
-                                    .op = .mul,
-                                    .args = &.{
-                                        .{
-                                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-                                            .kind = .{ .symbol = "x" },
-                                        },
-                                        .{
-                                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-                                            .kind = .{ .symbol = "y" },
-                                        },
-                                    },
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .op = .mul,
+                                .lhs = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                                    .kind = .{ .symbol = "x" },
+                                },
+                                .rhs = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                                    .kind = .{ .symbol = "y" },
                                 },
                             },
                         },
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-                            .kind = .{ .int = "5" },
-                        },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
+                        .kind = .{ .int = "5" },
                     },
                 },
             },
@@ -244,6 +235,65 @@ test "operator precedence higher first" {
 test "function call" {
     const allocator = std.testing.allocator;
     const source = "min(10, 20)";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 11 } },
+            .kind = .{
+                .call = .{
+                    .func = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
+                        .kind = .{ .symbol = "min" },
+                    },
+                    .args = &.{
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
+                            .kind = .{ .int = "10" },
+                        },
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
+                            .kind = .{ .int = "20" },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "variable declaration" {
+    const allocator = std.testing.allocator;
+    const source = "x = 5";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+            .kind = .{
+                .binary_op = .{
+                    .op = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                        .kind = .{ .symbol = "x" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                        .kind = .{ .int = "5" },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "function definition" {
+    const allocator = std.testing.allocator;
+    const source = "main = () { 42 }";
     var tokens = tokenize(source);
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
