@@ -87,19 +87,27 @@ fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expr
     std.debug.assert(tokens.next().?.kind == .right_paren);
     std.debug.assert(tokens.next().?.kind == .left_brace);
     var body = std.ArrayList(Expression).init(allocator);
-    const expression = try parseExpression(allocator, tokens, 0);
-    try body.append(expression);
-    const right_brace = tokens.next().?;
-    std.debug.assert(right_brace.kind == .right_brace);
-    return .{
-        .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
-        .kind = .{
-            .func = .{
-                .params = &.{},
-                .body = body.toOwnedSlice(),
+    while (tokens.peek()) |token| {
+        switch (token.kind) {
+            .right_brace => {
+                const right_brace = tokens.next().?;
+                return .{
+                    .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
+                    .kind = .{
+                        .func = .{
+                            .params = &.{},
+                            .body = body.toOwnedSlice(),
+                        },
+                    },
+                };
             },
-        },
-    };
+            else => {
+                const expression = try parseExpression(allocator, tokens, 0);
+                try body.append(expression);
+            },
+        }
+    }
+    unreachable;
 }
 
 const InfixParser = union(enum) {

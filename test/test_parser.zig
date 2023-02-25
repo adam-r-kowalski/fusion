@@ -6,37 +6,14 @@ const Expression = fusion.parser.Expression;
 const Ast = fusion.parser.Ast;
 const BinaryOp = fusion.parser.BinaryOp;
 
-fn expectEqualExpression(expected: Expression, actual: Expression) error{TestExpectedEqual}!void {
-    switch (expected.kind) {
-        .symbol => |e| try std.testing.expectEqualStrings(e, actual.kind.symbol),
-        .int => |e| try std.testing.expectEqualStrings(e, actual.kind.int),
-        .binary_op => |e| {
-            const a = actual.kind.binary_op;
-            try std.testing.expectEqual(e.op, a.op);
-            try expectEqualExpression(e.lhs.*, a.lhs.*);
-            try expectEqualExpression(e.rhs.*, a.rhs.*);
-        },
-        .call => |e| {
-            const a = actual.kind.call;
-            try expectEqualExpression(e.func.*, a.func.*);
-            try expectEqualExpressions(e.args, a.args);
-        },
-        .func => |e| {
-            const a = actual.kind.func;
-            try expectEqualExpressions(e.params, a.params);
-            try expectEqualExpressions(e.body, a.body);
-        },
-    }
-    try std.testing.expectEqual(expected.span, actual.span);
-}
-
 fn expectEqualExpressions(expected: []const Expression, actual: []const Expression) !void {
-    var i: usize = 0;
-    const max = std.math.min(expected.len, actual.len);
-    while (i < max) : (i += 1) {
-        try expectEqualExpression(expected[i], actual[i]);
-    }
-    try std.testing.expectEqual(expected.len, actual.len);
+    var actualString = std.ArrayList(u8).init(std.testing.allocator);
+    defer actualString.deinit();
+    try writeExpressions(actualString.writer(), actual);
+    var expectedString = std.ArrayList(u8).init(std.testing.allocator);
+    defer expectedString.deinit();
+    try writeExpressions(expectedString.writer(), expected);
+    try std.testing.expectEqualStrings(expectedString.items, actualString.items);
 }
 
 fn writeIndent(writer: anytype, indent: usize) !void {
@@ -47,12 +24,12 @@ fn writeIndent(writer: anytype, indent: usize) !void {
     }
 }
 
-fn writePosition(writer: anytype, expression: Expression) !void {
-    try std.fmt.format(writer, ".{{ {}, {} }}, .{{ {}, {} }}", .{
-        expression.start[0],
-        expression.start[1],
-        expression.end[0],
-        expression.end[1],
+fn writeSpan(writer: anytype, expression: Expression) !void {
+    try std.fmt.format(writer, ".span = .{{ .begin = .{{ .line = {}, .col = {} }}, .end = .{{ .line = {}, .col = {} }} }}", .{
+        expression.span.begin.line,
+        expression.span.begin.col,
+        expression.span.end.line,
+        expression.span.end.col,
     });
 }
 
@@ -60,46 +37,90 @@ fn opName(op: BinaryOp) []const u8 {
     return switch (op) {
         .add => ".add",
         .mul => ".mul",
+        .assign => ".assign",
     };
 }
 
-fn writeExpression(writer: anytype, expression: Expression, indent: usize) !void {
-    try writeIndent(writer, indent);
+fn writeExpression(writer: anytype, expression: Expression, indent: usize, newline: bool) !void {
+    if (newline) try writeIndent(writer, indent);
+    try writer.writeAll(".{");
+    try writeIndent(writer, indent + 1);
+    try writeSpan(writer, expression);
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll(".kind = .{ ");
     switch (expression.kind) {
-        .symbol => |s| {
-            try writer.writeAll("symbol(");
-            try writePosition(writer, expression);
-            try std.fmt.format(writer, ", \"{s}\"),", .{s});
+        .symbol => |s| try std.fmt.format(writer, ".symbol = \"{s}\" }},", .{s}),
+        .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
+        .binary_op => |b| {
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll(".binary_op = .{");
+            try writeIndent(writer, indent + 3);
+            try std.fmt.format(writer, ".op = {s},", .{opName(b.op)});
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".lhs = &");
+            try writeExpression(writer, b.lhs.*, indent + 3, false);
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".rhs = &");
+            try writeExpression(writer, b.rhs.*, indent + 3, false);
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 1);
+            try writer.writeAll("},");
         },
-        .int => |i| {
-            try writer.writeAll("int(");
-            try writePosition(writer, expression);
-            try std.fmt.format(writer, ", \"{s}\"),", .{i});
-        },
-        .binaryOp => |b| {
-            try writer.writeAll("binaryOp(");
-            try writePosition(writer, expression);
-            try std.fmt.format(writer, " {s}, &.{{", .{opName(b.op)});
-            for (b.args) |arg| {
-                try writeExpression(writer, arg, indent + 1);
+        .func => |f| {
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll(".func = .{");
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".params = &{");
+            for (f.params) |expr| {
+                try writeExpression(writer, expr, indent + 4, true);
             }
-            try writeIndent(writer, indent);
-            try writer.writeAll("}),");
+            if (f.params.len > 0) try writeIndent(writer, indent + 3);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".body = &{");
+            for (f.body) |expr| {
+                try writeExpression(writer, expr, indent + 4, true);
+            }
+            if (f.body.len > 0) try writeIndent(writer, indent + 3);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 1);
+            try writer.writeAll("},");
+        },
+        .call => |c| {
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll(".call = .{");
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".func = &");
+            try writeExpression(writer, c.func.*, indent + 3, false);
+            try writeIndent(writer, indent + 3);
+            try writer.writeAll(".args = &{");
+            for (c.args) |expr| {
+                try writeExpression(writer, expr, indent + 4, true);
+            }
+            if (c.args.len > 0) try writeIndent(writer, indent + 3);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 2);
+            try writer.writeAll("},");
+            try writeIndent(writer, indent + 1);
+            try writer.writeAll("},");
         },
     }
+    try writeIndent(writer, indent);
+    try writer.writeAll("},");
 }
 
-fn writeAst(writer: anytype, ast: Ast) !void {
-    try writer.writeAll("\n\n");
-    for (ast.expressions) |expr| {
-        try writeExpression(writer, expr, 0);
+fn writeExpressions(writer: anytype, expressions: []const Expression) !void {
+    for (expressions) |expr| {
+        try writeExpression(writer, expr, 0, true);
     }
-    try writer.writeAll("\n\n");
 }
 
 fn printAst(ast: Ast) !void {
     const writer = std.io.getStdOut().writer();
-    try writeAst(writer, ast);
+    try writeExpressions(writer, ast.expressions);
 }
 
 test "symbol" {
@@ -296,7 +317,7 @@ test "variable declaration" {
     try expectEqualExpressions(expected, ast.expressions);
 }
 
-test "function definition" {
+test "single line function definition" {
     const allocator = std.testing.allocator;
     const source = "main = () { 42 }";
     var tokens = tokenize(source);
@@ -321,6 +342,93 @@ test "function definition" {
                                     .{
                                         .span = .{ .begin = .{ .line = 0, .col = 12 }, .end = .{ .line = 0, .col = 14 } },
                                         .kind = .{ .int = "42" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "multi line function definition" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\main = () {
+        \\    x = 5
+        \\    y = 10
+        \\    x + y
+        \\}
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
+            .kind = .{
+                .binary_op = .{
+                    .op = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
+                        .kind = .{ .symbol = "main" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 4, .col = 1 } },
+                        .kind = .{
+                            .func = .{
+                                .params = &.{},
+                                .body = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .op = .assign,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
+                                                    .kind = .{ .int = "5" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                    .{
+                                        .span = .{ .begin = .{ .line = 2, .col = 6 }, .end = .{ .line = 2, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .op = .assign,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 5 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 2, .col = 8 }, .end = .{ .line = 2, .col = 10 } },
+                                                    .kind = .{ .int = "10" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                    .{
+                                        .span = .{ .begin = .{ .line = 3, .col = 6 }, .end = .{ .line = 3, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .op = .add,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                            },
+                                        },
                                     },
                                 },
                             },
