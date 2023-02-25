@@ -25,7 +25,8 @@ fn writeIndent(writer: anytype, indent: usize) !void {
 }
 
 fn writeSpan(writer: anytype, expression: Expression) !void {
-    try std.fmt.format(writer, ".span = .{{ .begin = .{{ .line = {}, .col = {} }}, .end = .{{ .line = {}, .col = {} }} }},", .{
+    const fmt = ".span = .{{ .begin = .{{ .line = {}, .col = {} }}, .end = .{{ .line = {}, .col = {} }} }},";
+    try std.fmt.format(writer, fmt, .{
         expression.span.begin.line,
         expression.span.begin.col,
         expression.span.end.line,
@@ -72,8 +73,18 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
             try writer.writeAll(".func = .{");
             try writeIndent(writer, indent + 3);
             try writer.writeAll(".params = &.{");
-            for (f.params) |expr| {
-                try writeExpression(writer, expr, indent + 4, true);
+            for (f.params) |param| {
+                try writeIndent(writer, indent + 4);
+                try writer.writeAll(".param = .{");
+                try writeIndent(writer, indent + 5);
+                try std.fmt.format(writer, ".name = \"{s}\",", .{param.name});
+                if (param.type) |type_| {
+                    try writeIndent(writer, indent + 5);
+                    try writer.writeAll(".type = &");
+                    try writeExpression(writer, type_, indent + 5, false);
+                    try writeIndent(writer, indent + 4);
+                    try writer.writeAll("},");
+                }
             }
             if (f.params.len > 0) try writeIndent(writer, indent + 3);
             try writer.writeAll("},");
@@ -465,14 +476,73 @@ test "function definition with parameters" {
                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
                         .kind = .{
                             .func = .{
+                                .params = &.{ .{ .name = "x" }, .{ .name = "y" } },
+                                .body = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .op = .add,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "typed function definition" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\add = (x: i32, y: i32): i32 {
+        \\    x + y
+        \\}
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+            .kind = .{
+                .binary_op = .{
+                    .op = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
+                        .kind = .{ .symbol = "add" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
+                        .kind = .{
+                            .func = .{
                                 .params = &.{
                                     .{
-                                        .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 8 } },
-                                        .kind = .{ .symbol = "x" },
+                                        .name = "x",
+                                        .type = .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 13 } },
+                                            .kind = .{ .symbol = "i32" },
+                                        },
                                     },
                                     .{
-                                        .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 11 } },
-                                        .kind = .{ .symbol = "y" },
+                                        .name = "y",
+                                        .type = .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 18 }, .end = .{ .line = 0, .col = 21 } },
+                                            .kind = .{ .symbol = "i32" },
+                                        },
                                     },
                                 },
                                 .body = &.{

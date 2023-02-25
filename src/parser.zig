@@ -14,6 +14,11 @@ pub const BinaryOp = enum {
     assign,
 };
 
+pub const Param = struct {
+    name: []const u8,
+    type: ?Expression = null,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
@@ -27,8 +32,9 @@ pub const Kind = union(enum) {
         args: []const Expression,
     },
     func: struct {
-        params: []const Expression,
+        params: []const Param,
         body: []const Expression,
+        return_type: ?*const Expression = null,
     },
 };
 
@@ -83,23 +89,53 @@ fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression
     }
 }
 
-fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expression {
-    var params = std.ArrayList(Expression).init(allocator);
+fn parseFunctionParams(allocator: Allocator, tokens: *Tokens) ![]const Param {
+    var params = std.ArrayList(Param).init(allocator);
     while (tokens.peek()) |token| {
         switch (token.kind) {
             .right_paren => {
-                _ = tokens.next().?;
+                _ = tokens.next();
                 break;
             },
-            .comma => {
-                _ = tokens.next().?;
+            .comma => _ = tokens.next(),
+            .symbol => |name| {
+                _ = tokens.next();
+                const type_ = blk: {
+                    if (tokens.peek()) |t| {
+                        if (t.kind == .colon) {
+                            _ = tokens.next();
+                            break :blk try parseExpression(allocator, tokens, HIGHEST);
+                        } else {
+                            break :blk null;
+                        }
+                    } else {
+                        break :blk null;
+                    }
+                };
+                const param: Param = .{ .name = name, .type = type_ };
+                try params.append(param);
             },
-            else => {
-                const expression = try parseExpression(allocator, tokens, HIGHEST);
-                try params.append(expression);
-            },
+            else => unreachable,
         }
     }
+    return params.toOwnedSlice();
+}
+
+fn parseFunctionReturnType(allocator: Allocator, tokens: *Tokens) !?*const Expression {
+    if (tokens.peek()) |token| {
+        if (token.kind == .colon) {
+            _ = tokens.next();
+            const return_type = try allocator.create(Expression);
+            return_type.* = try parseExpression(allocator, tokens, HIGHEST);
+            return return_type;
+        }
+    }
+    return null;
+}
+
+fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expression {
+    const params = try parseFunctionParams(allocator, tokens);
+    const return_type = try parseFunctionReturnType(allocator, tokens);
     std.debug.assert(tokens.next().?.kind == .left_brace);
     var body = std.ArrayList(Expression).init(allocator);
     while (tokens.peek()) |token| {
@@ -110,8 +146,9 @@ fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expr
                     .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
                     .kind = .{
                         .func = .{
-                            .params = params.toOwnedSlice(),
+                            .params = params,
                             .body = body.toOwnedSlice(),
+                            .return_type = return_type,
                         },
                     },
                 };
