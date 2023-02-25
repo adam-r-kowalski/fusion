@@ -25,7 +25,7 @@ fn writeIndent(writer: anytype, indent: usize) !void {
 }
 
 fn writeSpan(writer: anytype, expression: Expression) !void {
-    try std.fmt.format(writer, ".span = .{{ .begin = .{{ .line = {}, .col = {} }}, .end = .{{ .line = {}, .col = {} }} }}", .{
+    try std.fmt.format(writer, ".span = .{{ .begin = .{{ .line = {}, .col = {} }}, .end = .{{ .line = {}, .col = {} }} }},", .{
         expression.span.begin.line,
         expression.span.begin.col,
         expression.span.end.line,
@@ -71,14 +71,14 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
             try writeIndent(writer, indent + 2);
             try writer.writeAll(".func = .{");
             try writeIndent(writer, indent + 3);
-            try writer.writeAll(".params = &{");
+            try writer.writeAll(".params = &.{");
             for (f.params) |expr| {
                 try writeExpression(writer, expr, indent + 4, true);
             }
             if (f.params.len > 0) try writeIndent(writer, indent + 3);
             try writer.writeAll("},");
             try writeIndent(writer, indent + 3);
-            try writer.writeAll(".body = &{");
+            try writer.writeAll(".body = &.{");
             for (f.body) |expr| {
                 try writeExpression(writer, expr, indent + 4, true);
             }
@@ -425,6 +425,68 @@ test "multi line function definition" {
                                                 },
                                                 .rhs = &.{
                                                     .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "function definition with parameters" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\add = (x, y) {
+        \\    x + y
+        \\}
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+            .kind = .{
+                .binary_op = .{
+                    .op = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
+                        .kind = .{ .symbol = "add" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
+                        .kind = .{
+                            .func = .{
+                                .params = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 8 } },
+                                        .kind = .{ .symbol = "x" },
+                                    },
+                                    .{
+                                        .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 11 } },
+                                        .kind = .{ .symbol = "y" },
+                                    },
+                                },
+                                .body = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .op = .add,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
                                                     .kind = .{ .symbol = "y" },
                                                 },
                                             },

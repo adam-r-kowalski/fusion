@@ -84,7 +84,22 @@ fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression
 }
 
 fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expression {
-    std.debug.assert(tokens.next().?.kind == .right_paren);
+    var params = std.ArrayList(Expression).init(allocator);
+    while (tokens.peek()) |token| {
+        switch (token.kind) {
+            .right_paren => {
+                _ = tokens.next().?;
+                break;
+            },
+            .comma => {
+                _ = tokens.next().?;
+            },
+            else => {
+                const expression = try parseExpression(allocator, tokens, HIGHEST);
+                try params.append(expression);
+            },
+        }
+    }
     std.debug.assert(tokens.next().?.kind == .left_brace);
     var body = std.ArrayList(Expression).init(allocator);
     while (tokens.peek()) |token| {
@@ -95,7 +110,7 @@ fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expr
                     .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
                     .kind = .{
                         .func = .{
-                            .params = &.{},
+                            .params = params.toOwnedSlice(),
                             .body = body.toOwnedSlice(),
                         },
                     },
@@ -187,6 +202,7 @@ const ASSIGN = 0;
 const ADD = ASSIGN + 1;
 const MUL = ADD + 1;
 const CALL = MUL + 1;
+const HIGHEST = CALL + 1;
 
 fn parserPrecedence(parser: InfixParser) u8 {
     switch (parser) {
