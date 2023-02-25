@@ -26,6 +26,10 @@ pub const Kind = union(enum) {
         func: *const Expression,
         args: []const Expression,
     },
+    func: struct {
+        params: []const Expression,
+        body: []const Expression,
+    },
 };
 
 pub const Expression = struct {
@@ -52,7 +56,7 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
 
 fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOfMemory}!Expression {
     const token = tokens.next().?;
-    var left = prefixParser(token);
+    var left = try prefixParser(allocator, tokens, token);
     while (true) {
         if (infixParser(tokens)) |parser| {
             const nextPrecedence = parserPrecedence(parser);
@@ -67,15 +71,35 @@ fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{
     }
 }
 
-fn prefixParser(token: Token) Expression {
+fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression {
     switch (token.kind) {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
+        .left_paren => return try parseFunction(allocator, tokens, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
         },
     }
+}
+
+fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expression {
+    std.debug.assert(tokens.next().?.kind == .right_paren);
+    std.debug.assert(tokens.next().?.kind == .left_brace);
+    var body = std.ArrayList(Expression).init(allocator);
+    const expression = try parseExpression(allocator, tokens, 0);
+    try body.append(expression);
+    const right_brace = tokens.next().?;
+    std.debug.assert(right_brace.kind == .right_brace);
+    return .{
+        .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
+        .kind = .{
+            .func = .{
+                .params = &.{},
+                .body = body.toOwnedSlice(),
+            },
+        },
+    };
 }
 
 const InfixParser = union(enum) {

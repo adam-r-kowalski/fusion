@@ -16,10 +16,15 @@ fn expectEqualExpression(expected: Expression, actual: Expression) error{TestExp
             try expectEqualExpression(e.lhs.*, a.lhs.*);
             try expectEqualExpression(e.rhs.*, a.rhs.*);
         },
-        .call => |c| {
+        .call => |e| {
             const a = actual.kind.call;
-            try expectEqualExpression(c.func.*, a.func.*);
-            try expectEqualExpressions(c.args, a.args);
+            try expectEqualExpression(e.func.*, a.func.*);
+            try expectEqualExpressions(e.args, a.args);
+        },
+        .func => |e| {
+            const a = actual.kind.func;
+            try expectEqualExpressions(e.params, a.params);
+            try expectEqualExpressions(e.body, a.body);
         },
     }
     try std.testing.expectEqual(expected.span, actual.span);
@@ -299,21 +304,26 @@ test "function definition" {
     defer ast.deinit();
     const expected: []const Expression = &.{
         .{
-            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 11 } },
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
             .kind = .{
-                .call = .{
-                    .func = &.{
-                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-                        .kind = .{ .symbol = "min" },
+                .binary_op = .{
+                    .op = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
+                        .kind = .{ .symbol = "main" },
                     },
-                    .args = &.{
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
-                            .kind = .{ .int = "10" },
-                        },
-                        .{
-                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
-                            .kind = .{ .int = "20" },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 16 } },
+                        .kind = .{
+                            .func = .{
+                                .params = &.{},
+                                .body = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 0, .col = 12 }, .end = .{ .line = 0, .col = 14 } },
+                                        .kind = .{ .int = "42" },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
