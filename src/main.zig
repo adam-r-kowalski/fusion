@@ -1,36 +1,44 @@
 const std = @import("std");
 const fusion = @import("fusion");
-const importFunc = fusion.web_assembly.importFunc;
-const func = fusion.web_assembly.func;
-const start = fusion.web_assembly.start;
-const table = fusion.web_assembly.table;
-const elem = fusion.web_assembly.elem;
-const functype = fusion.web_assembly.functype;
-const p = fusion.web_assembly.param;
-const exportTable = fusion.web_assembly.exportTable;
-const exportFunc = fusion.web_assembly.exportFunc;
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
     const module = &.{
-        table("table", 2),
-        func("f", &.{}, &.{.i32}, &.{
-            .{ .i32_const = 42 },
-        }),
-        func("g", &.{}, &.{.i32}, &.{
-            .{ .i32_const = 13 },
-        }),
-        elem(0, "f"),
-        elem(1, "g"),
-        functype("return_i32", &.{}, &.{.i32}),
-        func("callByIndex", &.{p("i", .i32)}, &.{.i32}, &.{
-            .{ .local_get = "i" },
-            .{ .call_indirect = "return_i32" },
-        }),
-        exportTable("table", .{}),
-        exportFunc("callByIndex", .{}),
+        .{ .table = .{ .name = "table", .initial = 2 } },
+        .{
+            .func = .{
+                .name = "f",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{.{ .i32_const = 42 }},
+            },
+        },
+        .{
+            .func = .{
+                .name = "g",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{.{ .i32_const = 13 }},
+            },
+        },
+        .{ .elem = .{ .offset = 0, .name = "f" } },
+        .{ .elem = .{ .offset = 1, .name = "g" } },
+        .{ .functype = .{ .name = "return_i32", .params = &.{}, .results = &.{.i32} } },
+        .{
+            .func = .{
+                .name = "callByIndex",
+                .params = &.{.{ .name = "i", .type = .i32 }},
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .local_get = "i" },
+                    .{ .call_indirect = "return_i32" },
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "table", .kind = .{ .table = "table" } } },
+        .{ .export_ = .{ .name = "callByIndex", .kind = .{ .func = "callByIndex" } } },
     };
     const file = try std.fs.cwd().createFile("temp/temp.wat", .{});
     defer file.close();
