@@ -669,26 +669,43 @@ test "tee local variable" {
 test "loop" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("main", &.{}, &.{}, &.{
-            local("i", .i32),
-            loop("my_loop", &.{
-                // increment i
-                .{ .local_get = "i" },
-                .{ .i32_const = 1 },
-                .i32_add,
-                .{ .local_set = "i" },
-                // log i
-                .{ .local_get = "i" },
-                .{ .call = "log" },
-                // if i < 10 then loop
-                .{ .local_get = "i" },
-                .{ .i32_const = 10 },
-                .i32_lt_s,
-                .{ .br_if = "my_loop" },
-            }),
-        }),
-        start("main"),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "main",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .local = .{ .name = "i", .type = .i32 } },
+                    .{
+                        .loop = .{
+                            .name = "my_loop",
+                            .ops = &.{
+                                // increment i
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 1 },
+                                .i32_add,
+                                .{ .local_set = "i" },
+                                // log i
+                                .{ .local_get = "i" },
+                                .{ .call = "log" },
+                                // if i < 10 then loop
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 10 },
+                                .i32_lt_s,
+                                .{ .br_if = "my_loop" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{ .start = "main" },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -719,18 +736,35 @@ test "loop" {
 test "if then else" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("main", &.{}, &.{}, &.{
-            .{ .i32_const = 0 },
-            if_(&.{
-                .{ .i32_const = 1 },
-                .{ .call = "log" },
-            }, &.{
-                .{ .i32_const = 0 },
-                .{ .call = "log" },
-            }),
-        }),
-        start("main"),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "main",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .i32_const = 0 },
+                    .{
+                        .if_ = .{
+                            .then = &.{
+                                .{ .i32_const = 1 },
+                                .{ .call = "log" },
+                            },
+                            .else_ = &.{
+                                .{ .i32_const = 0 },
+                                .{ .call = "log" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{ .start = "main" },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -757,20 +791,38 @@ test "if then else" {
 test "block" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("log_if_not_100", &.{p("num", .i32)}, &.{}, &.{
-            block("my_block", &.{
-                .{ .local_get = "num" },
-                .{ .i32_const = 100 },
-                .i32_eq,
-                when(&.{
-                    .{ .br = "my_block" },
-                }),
-                .{ .local_get = "num" },
-                .{ .call = "log" },
-            }),
-        }),
-        exportFunc("log_if_not_100", .{}),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "log_if_not_100",
+                .params = &.{.{ .name = "num", .type = .i32 }},
+                .results = &.{},
+                .ops = &.{
+                    .{
+                        .block = .{ .name = "my_block", .ops = &.{
+                            .{ .local_get = "num" },
+                            .{ .i32_const = 100 },
+                            .i32_eq,
+                            .{
+                                .if_ = .{
+                                    .then = &.{
+                                        .{ .br = "my_block" },
+                                    },
+                                },
+                            },
+                            .{ .local_get = "num" },
+                            .{ .call = "log" },
+                        } },
+                    },
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "log_if_not_100", .kind = .{ .func = "log_if_not_100" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -798,10 +850,17 @@ test "block" {
 test "unreachable" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("throw", &.{}, &.{}, &.{
-            .unreachable_,
-        }),
-        exportFunc("throw", .{}),
+        .{
+            .func = .{
+                .name = "throw",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .unreachable_,
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "throw", .kind = .{ .func = "throw" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -819,15 +878,27 @@ test "unreachable" {
 test "select" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("select_simple", &.{}, &.{}, &.{
-            .{ .i32_const = 10 },
-            .{ .i32_const = 20 },
-            .{ .i32_const = 0 },
-            .select,
-            .{ .call = "log" },
-        }),
-        start("select_simple"),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "select_simple",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 20 },
+                    .{ .i32_const = 0 },
+                    .select,
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .start = "select_simple" },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -851,7 +922,16 @@ test "select" {
 test "nop" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("do_nothing", &.{}, &.{}, &.{.nop}),
+        .{
+            .func = .{
+                .name = "do_nothing",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .nop,
+                },
+            },
+        },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -867,12 +947,19 @@ test "nop" {
 test "return" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("get_90", &.{}, &.{.i32}, &.{
-            .{ .i32_const = 10 },
-            .{ .i32_const = 90 },
-            // return the second value (90); the first is discarded
-            .return_,
-        }),
+        .{
+            .func = .{
+                .name = "get_90",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 90 },
+                    // return the second value (90); the first is discarded
+                    .return_,
+                },
+            },
+        },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -890,14 +977,26 @@ test "return" {
 test "drop" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("main", &.{}, &.{}, &.{
-            .{ .i32_const = 10 },
-            .{ .i32_const = 20 },
-            .drop,
-            .{ .call = "log" },
-        }),
-        start("main"),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "main",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .i32_const = 10 },
+                    .{ .i32_const = 20 },
+                    .drop,
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .start = "main" },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
