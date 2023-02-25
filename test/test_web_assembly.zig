@@ -27,11 +27,18 @@ const exportTable = fusion.web_assembly.exportTable;
 test "non exported function" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
-            .{ .local_get = "lhs" },
-            .{ .local_get = "rhs" },
-            .i32_add,
-        }),
+        .{
+            .func = .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -49,12 +56,19 @@ test "non exported function" {
 test "exported function" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
-            .{ .local_get = "lhs" },
-            .{ .local_get = "rhs" },
-            .i32_add,
-        }),
-        exportFunc("add", .{}),
+        .{
+            .func = .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "add", .kind = .{ .func = "add" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -74,12 +88,19 @@ test "exported function" {
 test "exported function with new name" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("add", &.{ p("lhs", .i32), p("rhs", .i32) }, &.{.i32}, &.{
-            .{ .local_get = "lhs" },
-            .{ .local_get = "rhs" },
-            .i32_add,
-        }),
-        exportFunc("add", .{ .as = "myAdd" }),
+        .{
+            .func = .{
+                .name = "add",
+                .params = &.{ .{ .name = "lhs", .type = .i32 }, .{ .name = "rhs", .type = .i32 } },
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .local_get = "lhs" },
+                    .{ .local_get = "rhs" },
+                    .i32_add,
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "myAdd", .kind = .{ .func = "add" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -99,15 +120,27 @@ test "exported function with new name" {
 test "function call" {
     const allocator = std.testing.allocator;
     const module = &.{
-        func("getAnswer", &.{}, &.{.i32}, &.{
-            .{ .i32_const = 42 },
-        }),
-        func("getAnswerPlus1", &.{}, &.{.i32}, &.{
-            .{ .call = "getAnswer" },
-            .{ .i32_const = 1 },
-            .i32_add,
-        }),
-        exportFunc("getAnswerPlus1", .{}),
+        .{
+            .func = .{
+                .name = "getAnswer",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{.{ .i32_const = 42 }},
+            },
+        },
+        .{
+            .func = .{
+                .name = "getAnswerPlus1",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .call = "getAnswer" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "getAnswerPlus1", .kind = .{ .func = "getAnswerPlus1" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
@@ -130,12 +163,24 @@ test "function call" {
 test "import function" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importFunc(.{ "console", "log" }, "log", &.{.i32}, &.{}),
-        func("logIt", &.{}, &.{}, &.{
-            .{ .i32_const = 13 },
-            .{ .call = "log" },
-        }),
-        exportFunc("logIt", .{}),
+        .{
+            .import = .{
+                .path = .{ "console", "log" },
+                .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "logIt",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .i32_const = 13 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "logIt", .kind = .{ .func = "logIt" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
