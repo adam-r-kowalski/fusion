@@ -88,6 +88,11 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
             }
             if (f.params.len > 0) try writeIndent(writer, indent + 3);
             try writer.writeAll("},");
+            if (f.return_type) |return_type| {
+                try writeIndent(writer, indent + 3);
+                try writer.writeAll(".return_type = &");
+                try writeExpression(writer, return_type.*, indent + 3, false);
+            }
             try writeIndent(writer, indent + 3);
             try writer.writeAll(".body = &.{");
             for (f.body) |expr| {
@@ -544,6 +549,10 @@ test "typed function definition" {
                                             .kind = .{ .symbol = "i32" },
                                         },
                                     },
+                                },
+                                .return_type = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 24 }, .end = .{ .line = 0, .col = 27 } },
+                                    .kind = .{ .symbol = "i32" },
                                 },
                                 .body = &.{
                                     .{
