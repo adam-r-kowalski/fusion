@@ -201,18 +201,37 @@ test "import function" {
 test "import global variable" {
     const allocator = std.testing.allocator;
     const module = &.{
-        importGlobal(.{ "js", "global" }, "g", .i32, .mutable),
-        func("getGlobal", &.{}, &.{.i32}, &.{
-            .{ .global_get = "g" },
-        }),
-        func("incGlobal", &.{}, &.{}, &.{
-            .{ .global_get = "g" },
-            .{ .i32_const = 1 },
-            .i32_add,
-            .{ .global_set = "g" },
-        }),
-        exportFunc("getGlobal", .{}),
-        exportFunc("incGlobal", .{}),
+        .{
+            .import = .{
+                .path = .{ "js", "global" },
+                .kind = .{ .global = .{ .name = "g", .type = .i32, .mut = .mutable } },
+            },
+        },
+        .{
+            .func = .{
+                .name = "getGlobal",
+                .params = &.{},
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .global_get = "g" },
+                },
+            },
+        },
+        .{
+            .func = .{
+                .name = "incGlobal",
+                .params = &.{},
+                .results = &.{},
+                .ops = &.{
+                    .{ .global_get = "g" },
+                    .{ .i32_const = 1 },
+                    .i32_add,
+                    .{ .global_set = "g" },
+                },
+            },
+        },
+        .{ .export_ = .{ .name = "getGlobal", .kind = .{ .func = "getGlobal" } } },
+        .{ .export_ = .{ .name = "incGlobal", .kind = .{ .func = "incGlobal" } } },
     };
     var actual = try watAlloc(module, allocator);
     defer allocator.free(actual);
