@@ -40,43 +40,6 @@ pub const Ast = struct {
     }
 };
 
-pub fn symbol(start: [2]usize, end: [2]usize, value: []const u8) Expression {
-    return .{
-        .span = .{
-            .begin = .{ .line = start[0], .col = start[1] },
-            .end = .{ .line = end[0], .col = end[1] },
-        },
-        .kind = .{ .symbol = value },
-    };
-}
-
-pub fn int(start: [2]usize, end: [2]usize, value: []const u8) Expression {
-    return .{
-        .span = .{
-            .begin = .{ .line = start[0], .col = start[1] },
-            .end = .{ .line = end[0], .col = end[1] },
-        },
-        .kind = .{ .int = value },
-    };
-}
-
-pub fn binaryOp(
-    start: [2]usize,
-    end: [2]usize,
-    op: BinaryOp,
-    args: []const Expression,
-) Expression {
-    return .{
-        .span = .{
-            .begin = .{ .line = start[0], .col = start[1] },
-            .end = .{ .line = end[0], .col = end[1] },
-        },
-        .kind = .{
-            .binaryOp = .{ .op = op, .args = args },
-        },
-    };
-}
-
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
     var arena = Arena.init(allocator);
     var expressions = std.ArrayList(Expression).init(arena.allocator());
@@ -104,8 +67,8 @@ fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{
 
 fn prefixParser(token: Token) Expression {
     switch (token.kind) {
-        .symbol => |value| return symbol(token.start, token.end, value),
-        .int => |value| return int(token.start, token.end, value),
+        .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
+        .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -134,10 +97,11 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
 fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, value: BinaryOp, precedence: u8) !Expression {
     const infix = tokens.next().?;
     const right = try parseExpression(allocator, tokens, precedence);
-    const args = try allocator.alloc(Expression, 2);
-    args[0] = left;
-    args[1] = right;
-    return binaryOp(infix.start, infix.end, value, args);
+    const args = try allocator.dupe(Expression, &.{ left, right });
+    return .{
+        .span = infix.span,
+        .kind = .{ .binaryOp = .{ .op = value, .args = args } },
+    };
 }
 
 fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
@@ -150,10 +114,7 @@ fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expressio
                 const func = try allocator.create(Expression);
                 func.* = left;
                 return .{
-                    .span = .{
-                        .begin = .{ .line = left_paren.start[0], .col = left_paren.start[1] },
-                        .end = .{ .line = token.end[0], .col = token.end[1] },
-                    },
+                    .span = .{ .begin = left_paren.span.begin, .end = token.span.end },
                     .kind = .{
                         .call = .{
                             .func = func,

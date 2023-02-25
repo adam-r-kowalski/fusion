@@ -4,9 +4,6 @@ const tokenize = fusion.tokenizer.tokenize;
 const parse = fusion.parser.parse;
 const Expression = fusion.parser.Expression;
 const Ast = fusion.parser.Ast;
-const symbol = fusion.parser.symbol;
-const int = fusion.parser.int;
-const binaryOp = fusion.parser.binaryOp;
 const BinaryOp = fusion.parser.BinaryOp;
 
 fn expectEqualExpression(expected: Expression, actual: Expression) error{TestExpectedEqual}!void {
@@ -106,7 +103,10 @@ test "symbol" {
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
     const expected: []const Expression = &.{
-        symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+            .kind = .{ .symbol = "x" },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }
@@ -118,7 +118,10 @@ test "int" {
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
     const expected: []const Expression = &.{
-        int(.{ 0, 0 }, .{ 0, 1 }, "5"),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+            .kind = .{ .int = "5" },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }
@@ -130,10 +133,24 @@ test "add two symbols" {
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
     const expected: []const Expression = &.{
-        binaryOp(.{ 0, 2 }, .{ 0, 3 }, .add, &.{
-            symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
-            symbol(.{ 0, 4 }, .{ 0, 5 }, "y"),
-        }),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+            .kind = .{
+                .binaryOp = .{
+                    .op = .add,
+                    .args = &.{
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                            .kind = .{ .symbol = "x" },
+                        },
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                            .kind = .{ .symbol = "y" },
+                        },
+                    },
+                },
+            },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }
@@ -145,13 +162,38 @@ test "operator precedence lower first" {
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
     const expected: []const Expression = &.{
-        binaryOp(.{ 0, 2 }, .{ 0, 3 }, .add, &.{
-            symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
-            binaryOp(.{ 0, 6 }, .{ 0, 7 }, .mul, &.{
-                symbol(.{ 0, 4 }, .{ 0, 5 }, "y"),
-                int(.{ 0, 8 }, .{ 0, 9 }, "5"),
-            }),
-        }),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+            .kind = .{
+                .binaryOp = .{
+                    .op = .add,
+                    .args = &.{
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                            .kind = .{ .symbol = "x" },
+                        },
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
+                            .kind = .{
+                                .binaryOp = .{
+                                    .op = .mul,
+                                    .args = &.{
+                                        .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                                            .kind = .{ .symbol = "y" },
+                                        },
+                                        .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
+                                            .kind = .{ .int = "5" },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }
@@ -163,13 +205,38 @@ test "operator precedence higher first" {
     const ast = try parse(&tokens, allocator);
     defer ast.deinit();
     const expected: []const Expression = &.{
-        binaryOp(.{ 0, 6 }, .{ 0, 7 }, .add, &.{
-            binaryOp(.{ 0, 2 }, .{ 0, 3 }, .mul, &.{
-                symbol(.{ 0, 0 }, .{ 0, 1 }, "x"),
-                symbol(.{ 0, 4 }, .{ 0, 5 }, "y"),
-            }),
-            int(.{ 0, 8 }, .{ 0, 9 }, "5"),
-        }),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
+            .kind = .{
+                .binaryOp = .{
+                    .op = .add,
+                    .args = &.{
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+                            .kind = .{
+                                .binaryOp = .{
+                                    .op = .mul,
+                                    .args = &.{
+                                        .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+                                            .kind = .{ .symbol = "x" },
+                                        },
+                                        .{
+                                            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+                                            .kind = .{ .symbol = "y" },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        .{
+                            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
+                            .kind = .{ .int = "5" },
+                        },
+                    },
+                },
+            },
+        },
     };
     try expectEqualExpressions(expected, ast.expressions);
 }

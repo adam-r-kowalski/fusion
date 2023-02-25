@@ -134,12 +134,30 @@ test "braces brackets and parens" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        left_bracket(.{ 0, 0 }, .{ 0, 1 }),
-        left_brace(.{ 0, 1 }, .{ 0, 2 }),
-        left_paren(.{ 0, 2 }, .{ 0, 3 }),
-        right_paren(.{ 0, 3 }, .{ 0, 4 }),
-        right_brace(.{ 0, 4 }, .{ 0, 5 }),
-        right_bracket(.{ 0, 5 }, .{ 0, 6 }),
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
+            .kind = .left_bracket,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 1 }, .end = .{ .line = 0, .col = 2 } },
+            .kind = .left_brace,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
+            .kind = .left_paren,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 4 } },
+            .kind = .right_paren,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
+            .kind = .right_brace,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
+            .kind = .right_bracket,
+        },
     };
     try expectEqualTokens(expected, actual);
 }
