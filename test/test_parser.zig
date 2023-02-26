@@ -5,6 +5,10 @@ const parse = fusion.parser.parse;
 const Expression = fusion.parser.Expression;
 const Ast = fusion.parser.Ast;
 const BinaryOp = fusion.parser.BinaryOp;
+const BinaryOpKind = fusion.parser.BinaryOpKind;
+const Func = fusion.parser.Func;
+const Call = fusion.parser.Call;
+const Define = fusion.parser.Define;
 
 fn expectEqualExpressions(expected: []const Expression, actual: []const Expression) !void {
     var actualString = std.ArrayList(u8).init(std.testing.allocator);
@@ -34,15 +38,109 @@ fn writeSpan(writer: anytype, expression: Expression) !void {
     });
 }
 
-fn opName(op: BinaryOp) []const u8 {
-    return switch (op) {
+fn opName(kind: BinaryOpKind) []const u8 {
+    return switch (kind) {
         .add => ".add",
         .mul => ".mul",
         .assign => ".assign",
     };
 }
 
-fn writeExpression(writer: anytype, expression: Expression, indent: usize, newline: bool) !void {
+fn writeBinaryOp(writer: anytype, op: BinaryOp, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".binary_op = .{");
+    try writeIndent(writer, indent + 3);
+    try std.fmt.format(writer, ".kind = {s},", .{opName(op.kind)});
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".lhs = &");
+    try writeExpression(writer, op.lhs.*, indent + 3, false);
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".rhs = &");
+    try writeExpression(writer, op.rhs.*, indent + 3, false);
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
+fn writeFunc(writer: anytype, func: Func, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".func = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".params = &.{");
+    for (func.params) |param| {
+        try writeIndent(writer, indent + 4);
+        try writer.writeAll(".param = .{");
+        try writeIndent(writer, indent + 5);
+        try std.fmt.format(writer, ".name = \"{s}\",", .{param.name});
+        if (param.type) |type_| {
+            try writeIndent(writer, indent + 5);
+            try writer.writeAll(".type = &");
+            try writeExpression(writer, type_, indent + 5, false);
+            try writeIndent(writer, indent + 4);
+            try writer.writeAll("},");
+        }
+    }
+    if (func.params.len > 0) try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    if (func.return_type) |return_type| {
+        try writeIndent(writer, indent + 3);
+        try writer.writeAll(".return_type = &");
+        try writeExpression(writer, return_type.*, indent + 3, false);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".body = &.{");
+    for (func.body) |expr| {
+        try writeExpression(writer, expr, indent + 4, true);
+    }
+    if (func.body.len > 0) try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
+fn writeCall(writer: anytype, call: Call, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".call = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".func = &");
+    try writeExpression(writer, call.func.*, indent + 3, false);
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".args = &{");
+    for (call.args) |expr| {
+        try writeExpression(writer, expr, indent + 4, true);
+    }
+    if (call.args.len > 0) try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
+fn writeDefine(writer: anytype, define: Define, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".define = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".name = &");
+    try writeExpression(writer, define.name.*, indent + 3, false);
+    if (define.type) |type_| {
+        try writeIndent(writer, indent + 3);
+        try writer.writeAll(".type = &");
+        try writeExpression(writer, type_.*, indent + 3, false);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".value = &");
+    try writeExpression(writer, define.value.*, indent + 3, false);
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
+fn writeExpression(writer: anytype, expression: Expression, indent: usize, newline: bool) error{OutOfMemory}!void {
     if (newline) try writeIndent(writer, indent);
     try writer.writeAll(".{");
     try writeIndent(writer, indent + 1);
@@ -52,77 +150,10 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
     switch (expression.kind) {
         .symbol => |s| try std.fmt.format(writer, ".symbol = \"{s}\" }},", .{s}),
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
-        .binary_op => |b| {
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll(".binary_op = .{");
-            try writeIndent(writer, indent + 3);
-            try std.fmt.format(writer, ".op = {s},", .{opName(b.op)});
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".lhs = &");
-            try writeExpression(writer, b.lhs.*, indent + 3, false);
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".rhs = &");
-            try writeExpression(writer, b.rhs.*, indent + 3, false);
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll("},");
-            try writeIndent(writer, indent + 1);
-            try writer.writeAll("},");
-        },
-        .func => |f| {
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll(".func = .{");
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".params = &.{");
-            for (f.params) |param| {
-                try writeIndent(writer, indent + 4);
-                try writer.writeAll(".param = .{");
-                try writeIndent(writer, indent + 5);
-                try std.fmt.format(writer, ".name = \"{s}\",", .{param.name});
-                if (param.type) |type_| {
-                    try writeIndent(writer, indent + 5);
-                    try writer.writeAll(".type = &");
-                    try writeExpression(writer, type_, indent + 5, false);
-                    try writeIndent(writer, indent + 4);
-                    try writer.writeAll("},");
-                }
-            }
-            if (f.params.len > 0) try writeIndent(writer, indent + 3);
-            try writer.writeAll("},");
-            if (f.return_type) |return_type| {
-                try writeIndent(writer, indent + 3);
-                try writer.writeAll(".return_type = &");
-                try writeExpression(writer, return_type.*, indent + 3, false);
-            }
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".body = &.{");
-            for (f.body) |expr| {
-                try writeExpression(writer, expr, indent + 4, true);
-            }
-            if (f.body.len > 0) try writeIndent(writer, indent + 3);
-            try writer.writeAll("},");
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll("},");
-            try writeIndent(writer, indent + 1);
-            try writer.writeAll("},");
-        },
-        .call => |c| {
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll(".call = .{");
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".func = &");
-            try writeExpression(writer, c.func.*, indent + 3, false);
-            try writeIndent(writer, indent + 3);
-            try writer.writeAll(".args = &{");
-            for (c.args) |expr| {
-                try writeExpression(writer, expr, indent + 4, true);
-            }
-            if (c.args.len > 0) try writeIndent(writer, indent + 3);
-            try writer.writeAll("},");
-            try writeIndent(writer, indent + 2);
-            try writer.writeAll("},");
-            try writeIndent(writer, indent + 1);
-            try writer.writeAll("},");
-        },
+        .binary_op => |op| try writeBinaryOp(writer, op, indent),
+        .func => |f| try writeFunc(writer, f, indent),
+        .call => |c| try writeCall(writer, c, indent),
+        .define => |d| try writeDefine(writer, d, indent),
     }
     try writeIndent(writer, indent);
     try writer.writeAll("},");
@@ -180,7 +211,7 @@ test "add two symbols" {
             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .add,
+                    .kind = .add,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
                         .kind = .{ .symbol = "x" },
@@ -207,7 +238,7 @@ test "operator precedence lower first" {
             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .add,
+                    .kind = .add,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
                         .kind = .{ .symbol = "x" },
@@ -216,7 +247,7 @@ test "operator precedence lower first" {
                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
                         .kind = .{
                             .binary_op = .{
-                                .op = .mul,
+                                .kind = .mul,
                                 .lhs = &.{
                                     .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
                                     .kind = .{ .symbol = "y" },
@@ -246,12 +277,12 @@ test "operator precedence higher first" {
             .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .add,
+                    .kind = .add,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
                         .kind = .{
                             .binary_op = .{
-                                .op = .mul,
+                                .kind = .mul,
                                 .lhs = &.{
                                     .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
                                     .kind = .{ .symbol = "x" },
@@ -317,7 +348,7 @@ test "variable declaration" {
             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .assign,
+                    .kind = .assign,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
                         .kind = .{ .symbol = "x" },
@@ -344,7 +375,7 @@ test "single line function definition" {
             .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .assign,
+                    .kind = .assign,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
                         .kind = .{ .symbol = "main" },
@@ -387,7 +418,7 @@ test "multi line function definition" {
             .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .assign,
+                    .kind = .assign,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
                         .kind = .{ .symbol = "main" },
@@ -402,7 +433,7 @@ test "multi line function definition" {
                                         .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
                                         .kind = .{
                                             .binary_op = .{
-                                                .op = .assign,
+                                                .kind = .assign,
                                                 .lhs = &.{
                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
                                                     .kind = .{ .symbol = "x" },
@@ -418,7 +449,7 @@ test "multi line function definition" {
                                         .span = .{ .begin = .{ .line = 2, .col = 6 }, .end = .{ .line = 2, .col = 7 } },
                                         .kind = .{
                                             .binary_op = .{
-                                                .op = .assign,
+                                                .kind = .assign,
                                                 .lhs = &.{
                                                     .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 5 } },
                                                     .kind = .{ .symbol = "y" },
@@ -434,7 +465,7 @@ test "multi line function definition" {
                                         .span = .{ .begin = .{ .line = 3, .col = 6 }, .end = .{ .line = 3, .col = 7 } },
                                         .kind = .{
                                             .binary_op = .{
-                                                .op = .add,
+                                                .kind = .add,
                                                 .lhs = &.{
                                                     .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
                                                     .kind = .{ .symbol = "x" },
@@ -472,7 +503,7 @@ test "function definition with parameters" {
             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .assign,
+                    .kind = .assign,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
                         .kind = .{ .symbol = "add" },
@@ -487,7 +518,7 @@ test "function definition with parameters" {
                                         .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
                                         .kind = .{
                                             .binary_op = .{
-                                                .op = .add,
+                                                .kind = .add,
                                                 .lhs = &.{
                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
                                                     .kind = .{ .symbol = "x" },
@@ -525,7 +556,7 @@ test "typed function definition" {
             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
             .kind = .{
                 .binary_op = .{
-                    .op = .assign,
+                    .kind = .assign,
                     .lhs = &.{
                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
                         .kind = .{ .symbol = "add" },
@@ -559,13 +590,110 @@ test "typed function definition" {
                                         .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
                                         .kind = .{
                                             .binary_op = .{
-                                                .op = .add,
+                                                .kind = .add,
                                                 .lhs = &.{
                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
                                                     .kind = .{ .symbol = "x" },
                                                 },
                                                 .rhs = &.{
                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "typed variable declaration" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\main = () -> i32 {
+        \\    x: i32 = 5
+        \\    y: i32 = 10
+        \\    x + y
+        \\}
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .assign,
+                    .lhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
+                        .kind = .{ .symbol = "main" },
+                    },
+                    .rhs = &.{
+                        .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 4, .col = 1 } },
+                        .kind = .{
+                            .func = .{
+                                .params = &.{},
+                                .return_type = &.{
+                                    .span = .{ .begin = .{ .line = 0, .col = 13 }, .end = .{ .line = 0, .col = 16 } },
+                                    .kind = .{ .symbol = "i32" },
+                                },
+                                .body = &.{
+                                    .{
+                                        .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 14 } },
+                                        .kind = .{
+                                            .define = .{
+                                                .name = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .type = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 7 }, .end = .{ .line = 1, .col = 10 } },
+                                                    .kind = .{ .symbol = "i32" },
+                                                },
+                                                .value = &.{
+                                                    .span = .{ .begin = .{ .line = 1, .col = 13 }, .end = .{ .line = 1, .col = 14 } },
+                                                    .kind = .{ .int = "5" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                    .{
+                                        .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 15 } },
+                                        .kind = .{
+                                            .define = .{
+                                                .name = &.{
+                                                    .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 5 } },
+                                                    .kind = .{ .symbol = "y" },
+                                                },
+                                                .type = &.{
+                                                    .span = .{ .begin = .{ .line = 2, .col = 7 }, .end = .{ .line = 2, .col = 10 } },
+                                                    .kind = .{ .symbol = "i32" },
+                                                },
+                                                .value = &.{
+                                                    .span = .{ .begin = .{ .line = 2, .col = 13 }, .end = .{ .line = 2, .col = 15 } },
+                                                    .kind = .{ .int = "10" },
+                                                },
+                                            },
+                                        },
+                                    },
+                                    .{
+                                        .span = .{ .begin = .{ .line = 3, .col = 6 }, .end = .{ .line = 3, .col = 7 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .kind = .add,
+                                                .lhs = &.{
+                                                    .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
+                                                    .kind = .{ .symbol = "x" },
+                                                },
+                                                .rhs = &.{
+                                                    .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
                                                     .kind = .{ .symbol = "y" },
                                                 },
                                             },

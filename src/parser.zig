@@ -8,7 +8,7 @@ const Token = tokenizer.Token;
 const Position = tokenizer.Position;
 const Span = tokenizer.Span;
 
-pub const BinaryOp = enum {
+pub const BinaryOpKind = enum {
     add,
     mul,
     assign,
@@ -19,23 +19,36 @@ pub const Param = struct {
     type: ?Expression = null,
 };
 
+pub const BinaryOp = struct {
+    kind: BinaryOpKind,
+    lhs: *const Expression,
+    rhs: *const Expression,
+};
+
+pub const Call = struct {
+    func: *const Expression,
+    args: []const Expression,
+};
+
+pub const Func = struct {
+    params: []const Param,
+    body: []const Expression,
+    return_type: ?*const Expression = null,
+};
+
+pub const Define = struct {
+    name: *const Expression,
+    type: ?*const Expression = null,
+    value: *const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
-    binary_op: struct {
-        op: BinaryOp,
-        lhs: *const Expression,
-        rhs: *const Expression,
-    },
-    call: struct {
-        func: *const Expression,
-        args: []const Expression,
-    },
-    func: struct {
-        params: []const Param,
-        body: []const Expression,
-        return_type: ?*const Expression = null,
-    },
+    binary_op: BinaryOp,
+    call: Call,
+    func: Func,
+    define: Define,
 };
 
 pub const Expression = struct {
@@ -163,8 +176,9 @@ fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expr
 }
 
 const InfixParser = union(enum) {
-    binary_op: BinaryOp,
+    binary_op: BinaryOpKind,
     call,
+    define_or_range,
 };
 
 fn infixParser(tokens: *Tokens) ?InfixParser {
@@ -174,6 +188,7 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
             .times => return .{ .binary_op = .mul },
             .equal => return .{ .binary_op = .assign },
             .left_paren => return .call,
+            .colon => return .define_or_range,
             else => return null,
         }
     } else {
@@ -181,7 +196,7 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
     }
 }
 
-fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, value: BinaryOp, precedence: u8) !Expression {
+fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, kind: BinaryOpKind, precedence: u8) !Expression {
     const infix = tokens.next().?;
     const lhs = try allocator.create(Expression);
     lhs.* = left;
@@ -189,7 +204,7 @@ fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, value:
     rhs.* = try parseExpression(allocator, tokens, precedence);
     return .{
         .span = infix.span,
-        .kind = .{ .binary_op = .{ .op = value, .lhs = lhs, .rhs = rhs } },
+        .kind = .{ .binary_op = .{ .kind = kind, .lhs = lhs, .rhs = rhs } },
     };
 }
 
@@ -222,6 +237,27 @@ fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expressio
     unreachable;
 }
 
+fn parseDefineOrRange(allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
+    _ = tokens.next();
+    const name = try allocator.create(Expression);
+    name.* = left;
+    const type_ = try allocator.create(Expression);
+    type_.* = try parseExpression(allocator, tokens, HIGHEST);
+    std.debug.assert(tokens.next().?.kind == .equal);
+    const value = try allocator.create(Expression);
+    value.* = try parseExpression(allocator, tokens, LOWEST);
+    return .{
+        .span = .{ .begin = left.span.begin, .end = value.span.end },
+        .kind = .{
+            .define = .{
+                .name = name,
+                .type = type_,
+                .value = value,
+            },
+        },
+    };
+}
+
 fn runParser(
     parser: InfixParser,
     allocator: Allocator,
@@ -232,10 +268,12 @@ fn runParser(
     switch (parser) {
         .binary_op => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
         .call => return parseCall(allocator, tokens, left),
+        .define_or_range => return try parseDefineOrRange(allocator, tokens, left),
     }
 }
 
-const ASSIGN = 0;
+const LOWEST = 0;
+const ASSIGN = LOWEST;
 const ADD = ASSIGN + 1;
 const MUL = ADD + 1;
 const CALL = MUL + 1;
@@ -251,5 +289,6 @@ fn parserPrecedence(parser: InfixParser) u8 {
             }
         },
         .call => return CALL,
+        .define_or_range => return HIGHEST,
     }
 }

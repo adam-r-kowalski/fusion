@@ -97,6 +97,7 @@ fn tokenizeNumber(tokens: *Tokens) Token {
             else => {},
         }
     }
+    advance(tokens, i);
     const span = .{ .begin = begin, .end = tokens.pos };
     if (decimals > 0)
         return .{ .span = span, .kind = .{ .float = value } };
