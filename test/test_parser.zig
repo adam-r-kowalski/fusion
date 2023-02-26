@@ -513,7 +513,7 @@ test "function definition with parameters" {
 test "typed function definition" {
     const allocator = std.testing.allocator;
     const source =
-        \\add = (x: i32, y: i32): i32 {
+        \\add = (x: i32, y: i32) -> i32 {
         \\    x + y
         \\}
     ;
@@ -551,7 +551,7 @@ test "typed function definition" {
                                     },
                                 },
                                 .return_type = &.{
-                                    .span = .{ .begin = .{ .line = 0, .col = 24 }, .end = .{ .line = 0, .col = 27 } },
+                                    .span = .{ .begin = .{ .line = 0, .col = 26 }, .end = .{ .line = 0, .col = 29 } },
                                     .kind = .{ .symbol = "i32" },
                                 },
                                 .body = &.{

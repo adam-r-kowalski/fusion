@@ -123,7 +123,7 @@ fn parseFunctionParams(allocator: Allocator, tokens: *Tokens) ![]const Param {
 
 fn parseFunctionReturnType(allocator: Allocator, tokens: *Tokens) !?*const Expression {
     if (tokens.peek()) |token| {
-        if (token.kind == .colon) {
+        if (token.kind == .right_arrow) {
             _ = tokens.next();
             const return_type = try allocator.create(Expression);
             return_type.* = try parseExpression(allocator, tokens, HIGHEST);

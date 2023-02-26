@@ -31,6 +31,8 @@ pub const Kind = union(enum) {
     bang,
     bang_equal,
     colon,
+    left_arrow,
+    right_arrow,
 };
 
 pub const Position = struct {
@@ -84,15 +86,18 @@ fn tokenizeNumber(tokens: *Tokens) Token {
         decimals -= 1;
     }
     const value = tokens.source[0..i];
-    advance(tokens, i);
-    const span = .{ .begin = begin, .end = tokens.pos };
     if (value.len == 1) {
         switch (value[0]) {
-            '-' => return .{ .span = span, .kind = .minus },
-            '.' => return .{ .span = span, .kind = .dot },
+            '-' => return tokenizeOneOrTwo(tokens, .minus, '>', .right_arrow),
+            '.' => {
+                advance(tokens, i);
+                const span = .{ .begin = begin, .end = tokens.pos };
+                return .{ .span = span, .kind = .dot };
+            },
             else => {},
         }
     }
+    const span = .{ .begin = begin, .end = tokens.pos };
     if (decimals > 0)
         return .{ .span = span, .kind = .{ .float = value } };
     return .{ .span = span, .kind = .{ .int = value } };
@@ -155,6 +160,22 @@ fn tokenizeOneOrTwo(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind) Token 
     return .{ .kind = kind, .span = .{ .begin = begin, .end = tokens.pos } };
 }
 
+fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, third: u8, kind3: Kind) Token {
+    const begin = tokens.pos;
+    if (tokens.source.len > 1) {
+        if (tokens.source[1] == second) {
+            advance(tokens, 2);
+            return .{ .kind = kind2, .span = .{ .begin = begin, .end = tokens.pos } };
+        }
+        if (tokens.source[1] == third) {
+            advance(tokens, 2);
+            return .{ .kind = kind3, .span = .{ .begin = begin, .end = tokens.pos } };
+        }
+    }
+    advance(tokens, 1);
+    return .{ .kind = kind, .span = .{ .begin = begin, .end = tokens.pos } };
+}
+
 pub const Tokens = struct {
     source: []const u8,
     pos: Position = .{ .line = 0, .col = 0 },
@@ -186,7 +207,7 @@ pub const Tokens = struct {
             '(' => return tokenizeOne(self, .left_paren),
             ')' => return tokenizeOne(self, .right_paren),
             '=' => return tokenizeOneOrTwo(self, .equal, '=', .equal_equal),
-            '<' => return tokenizeOneOrTwo(self, .less, '=', .less_equal),
+            '<' => return tokenizeOneOrTwoChoice(self, .less, '=', .less_equal, '-', .left_arrow),
             '>' => return tokenizeOneOrTwo(self, .greater, '=', .greater_equal),
             '!' => return tokenizeOneOrTwo(self, .bang, '=', .bang_equal),
             '+' => return tokenizeOne(self, .plus),

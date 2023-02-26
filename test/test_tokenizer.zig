@@ -235,7 +235,7 @@ test "boolean operators" {
 
 test "access operators" {
     const allocator = std.testing.allocator;
-    const source = "= . &";
+    const source = "= . & -> <-";
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
@@ -250,6 +250,14 @@ test "access operators" {
         .{
             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
             .kind = .ampersand,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 8 } },
+            .kind = .right_arrow,
+        },
+        .{
+            .span = .{ .begin = .{ .line = 0, .col = 9 }, .end = .{ .line = 0, .col = 11 } },
+            .kind = .left_arrow,
         },
     };
     try expectEqualTokens(expected, actual);
