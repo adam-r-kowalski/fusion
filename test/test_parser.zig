@@ -216,84 +216,66 @@ test "add two symbols" {
     try expectEqualExpressions(expected, ast.expressions);
 }
 
-// test "operator precedence lower first" {
-//     const allocator = std.testing.allocator;
-//     const source = "x + y * 5";
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .add,
-//                     .lhs = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-//                         .kind = .{ .symbol = "x" },
-//                     },
-//                     .rhs = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-//                         .kind = .{
-//                             .binary_op = .{
-//                                 .kind = .mul,
-//                                 .lhs = &.{
-//                                     .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-//                                     .kind = .{ .symbol = "y" },
-//                                 },
-//                                 .rhs = &.{
-//                                     .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-//                                     .kind = .{ .int = "5" },
-//                                 },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
-// test "operator precedence higher first" {
-//     const allocator = std.testing.allocator;
-//     const source = "x * y + 5";
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .add,
-//                     .lhs = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-//                         .kind = .{
-//                             .binary_op = .{
-//                                 .kind = .mul,
-//                                 .lhs = &.{
-//                                     .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-//                                     .kind = .{ .symbol = "x" },
-//                                 },
-//                                 .rhs = &.{
-//                                     .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-//                                     .kind = .{ .symbol = "y" },
-//                                 },
-//                             },
-//                         },
-//                     },
-//                     .rhs = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-//                         .kind = .{ .int = "5" },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
+test "operator precedence lower first" {
+    const allocator = std.testing.allocator;
+    const source = "x + y * 5";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .add,
+                    .lhs = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .rhs = &.{
+                        .span = .{ .{ 0, 6 }, .{ 0, 7 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .mul,
+                                .lhs = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                                .rhs = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
+test "operator precedence higher first" {
+    const allocator = std.testing.allocator;
+    const source = "x * y + 5";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 6 }, .{ 0, 7 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .add,
+                    .lhs = &.{
+                        .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .mul,
+                                .lhs = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                                .rhs = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                            },
+                        },
+                    },
+                    .rhs = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
 // test "function call" {
 //     const allocator = std.testing.allocator;
 //     const source = "min(10, 20)";
