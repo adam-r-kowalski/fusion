@@ -1,0 +1,135 @@
+# credit https://google-research.github.io/dex-lang/examples/tutorial.html
+# you can create multi dimensional arrays using for expressions
+# here x is an array of f64 with a shape of 3 x 8 where each value is 1.0
+
+x : 3=>8=>F64
+x = for i:3 -> for j:8 -> 1.0
+
+
+# you can add 5 to each element in x to create a new array
+# x2 has the same type as x
+
+x2 = for i:3 -> for j:8 -> x.i.j + 5
+
+
+# you can infer the index range if the size is known at compile time
+
+x3 = for i -> for j -> x.i.j + 5
+
+
+# you can include several variables in a for expression
+
+x4 = for i, j -> x.i.j + 5
+
+
+# to find the mean of every column
+
+x5 = for i -> mean x.i
+
+
+# you can define a function which adds 5
+
+add5 : F64 -> F64
+add5 = \x -> x + 5
+
+# you can define a function which adds 5 to a table
+
+tableAdd5 : n=>F64 -> n=>F64
+tableAdd5 = \x -> for i -> x.i + 5
+
+
+# a function which transposes a matrix
+
+transpose : m=>n=>F64 -> n=>m=>F64
+transpose = \x -> for i, j -> x.j.i
+
+
+# what if we want it generic over the value type so it is not restricted to F64
+
+transpose : m=>n=>v -> n=>m=>v
+transpose = \x -> for i, j -> x.j.i
+
+
+# we can ensure the shapes of tables match
+
+tableAdd : m=>n=>F32 -> m=>n=>F32 -> n=>m=>F32
+tableAdd = \x, y -> for i, j -> x.i.j + y.i.j
+
+
+# Mutation requires using the assignment operator 
+
+tableMean : n=>F32 -> F32
+tableMean = \x -> 
+  s := 0.0
+  for i -> s += x.i
+  s / n
+
+
+test "table mean" \_ ->
+	expect tableMean [0.0, 1.0, 0.5] == 0.5
+	
+	
+# You can define interfaces	
+
+interface Add a
+  add : a -> a -> a
+  zero : a
+
+
+# You can implement interfaces with instance
+
+implement Add (F32, F32)
+	add = \(x1, y1), (x2, y2) -> (x1 + x2, y1 + y2)
+	zero = (0, 0)
+	
+
+# Interfaces can define requirements
+
+interface VSpace a where Add a
+	scaleVec : F32 -> a -> a
+
+implement VSpace (F32, F32)
+	scaleVec = \s, (x, y) -> (x * s, y * s)
+
+
+# Now we can define a generic table mean which works for more value types
+
+tableMean : n=>v -> v where VSpace v
+tableMean = \x ->
+  s := zero
+  for i -> s += x.i
+  s / n
+
+
+test "table mean" \_ ->
+	expect tableMean [0.1, 0.5, 0.9] == 0.5
+	expect tableMean [(1.0, 0.5), (0.5, 0.8)] == (0.75, 0.65)
+
+
+# You can implement Add for pairs of any type implementing Add
+
+implement Add (a, b) where Add a & Add b
+	add = \(x1, y1), (x2, y2) -> (x1 + x2, y1 + y2)
+	zero = (0, 0)
+
+
+# Sum can be implemented using either assignment
+
+sum : n=>F32 -> F32
+sum = \x ->
+  s := 0.0
+  for i -> s += x.i
+  s
+
+
+# Or using a fold
+
+sum : n=>F32 -> F32
+sum = \x -> fold 0.0 x +
+
+
+# This can also help with our table mean
+
+tableMean : n=>v -> v where VSpace v
+tableMean = \x ->
+  (fold zero x +) / n
