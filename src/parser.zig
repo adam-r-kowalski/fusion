@@ -6,7 +6,7 @@ const tokenizer = @import("./tokenizer.zig");
 const Tokens = tokenizer.Tokens;
 const Token = tokenizer.Token;
 const Position = tokenizer.Position;
-const Span = tokenizer.Span;
+pub const Span = tokenizer.Span;
 
 pub const BinaryOpKind = enum {
     add,
@@ -156,7 +156,7 @@ fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expr
             .right_brace => {
                 const right_brace = tokens.next().?;
                 return .{
-                    .span = .{ .begin = left_paren.span.begin, .end = right_brace.span.end },
+                    .span = .{ left_paren.span[0], right_brace.span[1] },
                     .kind = .{
                         .func = .{
                             .params = params,
@@ -185,7 +185,7 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
     if (tokens.peek()) |token| {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
-            .times => return .{ .binary_op = .mul },
+            .star => return .{ .binary_op = .mul },
             .equal => return .{ .binary_op = .assign },
             .left_paren => return .call,
             .colon => return .define_or_range,
@@ -218,7 +218,7 @@ fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expressio
                 const func = try allocator.create(Expression);
                 func.* = left;
                 return .{
-                    .span = .{ .begin = left_paren.span.begin, .end = token.span.end },
+                    .span = .{ left_paren.span[0], token.span[1] },
                     .kind = .{
                         .call = .{
                             .func = func,
@@ -247,7 +247,7 @@ fn parseDefineOrRange(allocator: Allocator, tokens: *Tokens, left: Expression) !
     const value = try allocator.create(Expression);
     value.* = try parseExpression(allocator, tokens, LOWEST);
     return .{
-        .span = .{ .begin = left.span.begin, .end = value.span.end },
+        .span = .{ left.span[0], value.span[1] },
         .kind = .{
             .define = .{
                 .name = name,
