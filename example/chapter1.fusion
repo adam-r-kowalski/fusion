@@ -59,7 +59,7 @@ tableAdd = \x, y -> for i, j -> x.i.j + y.i.j
 # Mutation requires using the assignment operator 
 
 tableMean : n=>F32 -> F32
-tableMean = \x -> 
+tableMean = \x ->
   s := 0.0
   for i -> s += x.i
   s / n
@@ -85,7 +85,7 @@ implement Add (F32, F32)
 
 # Interfaces can define requirements
 
-interface VSpace a where Add a
+interface [Add a] VSpace a
 	scaleVec : F32 -> a -> a
 
 implement VSpace (F32, F32)
@@ -94,7 +94,7 @@ implement VSpace (F32, F32)
 
 # Now we can define a generic table mean which works for more value types
 
-tableMean : n=>v -> v where VSpace v
+tableMean : [VSpace v] n=>v -> v
 tableMean = \x ->
   s := zero
   for i -> s += x.i
@@ -108,7 +108,7 @@ test "table mean" \_ ->
 
 # You can implement Add for pairs of any type implementing Add
 
-implement Add (a, b) where Add a & Add b
+implement [Add a, Add b] Add (a, b)
 	add = \(x1, y1), (x2, y2) -> (x1 + x2, y1 + y2)
 	zero = (0, 0)
 
@@ -130,6 +130,6 @@ sum = \x -> fold 0.0 x +
 
 # This can also help with our table mean
 
-tableMean : n=>v -> v where VSpace v
+tableMean : [VSpace v] n=>v -> v
 tableMean = \x ->
   (fold zero x +) / n

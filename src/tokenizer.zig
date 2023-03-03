@@ -15,11 +15,11 @@ pub const Kind = union(enum) {
     less,
     greater,
     plus,
-    minus,
-    times,
-    div,
+    dash,
+    star,
+    slash,
+    backslash,
     dot,
-    ampersand,
     caret,
     not,
     and_,
@@ -33,17 +33,14 @@ pub const Kind = union(enum) {
     colon,
     left_arrow,
     right_arrow,
+    indent,
 };
 
-pub const Position = struct {
-    line: usize,
-    col: usize,
-};
+/// row, col
+pub const Position = [2]usize;
 
-pub const Span = struct {
-    begin: Position,
-    end: Position,
-};
+/// begin, end
+pub const Span = [2]Position;
 
 pub const Token = struct {
     span: Span,
@@ -54,10 +51,10 @@ fn trim(tokens: *Tokens) void {
     var i: usize = 0;
     while (i < tokens.source.len) : (i += 1) {
         switch (tokens.source[i]) {
-            ' ' => tokens.pos.col += 1,
+            ' ' => tokens.pos[1] += 1,
             '\n' => {
-                tokens.pos.line += 1;
-                tokens.pos.col = 0;
+                tokens.pos[0] += 1;
+                tokens.pos[1] = 0;
             },
             else => break,
         }
@@ -67,7 +64,7 @@ fn trim(tokens: *Tokens) void {
 
 fn advance(tokens: *Tokens, columns: usize) void {
     tokens.source = tokens.source[columns..];
-    tokens.pos.col += columns;
+    tokens.pos[1] += columns;
 }
 
 fn tokenizeNumber(tokens: *Tokens) Token {
@@ -88,17 +85,16 @@ fn tokenizeNumber(tokens: *Tokens) Token {
     const value = tokens.source[0..i];
     if (value.len == 1) {
         switch (value[0]) {
-            '-' => return tokenizeOneOrTwo(tokens, .minus, '>', .right_arrow),
+            '-' => return tokenizeOneOrTwo(tokens, .dash, '>', .right_arrow),
             '.' => {
                 advance(tokens, i);
-                const span = .{ .begin = begin, .end = tokens.pos };
-                return .{ .span = span, .kind = .dot };
+                return .{ .span = .{ begin, tokens.pos }, .kind = .dot };
             },
             else => {},
         }
     }
     advance(tokens, i);
-    const span = .{ .begin = begin, .end = tokens.pos };
+    const span: Span = .{ begin, tokens.pos };
     if (decimals > 0)
         return .{ .span = span, .kind = .{ .float = value } };
     return .{ .span = span, .kind = .{ .int = value } };
@@ -138,7 +134,7 @@ fn tokenizeSymbol(tokens: *Tokens) Token {
     while (i < tokens.source.len and !reserved(tokens.source[i])) : (i += 1) {}
     const value = tokens.source[0..i];
     advance(tokens, i);
-    const span = .{ .begin = begin, .end = tokens.pos };
+    const span: Span = .{ begin, tokens.pos };
     if (eql(u8, value, "not")) return .{ .span = span, .kind = .not };
     if (eql(u8, value, "and")) return .{ .span = span, .kind = .and_ };
     if (eql(u8, value, "or")) return .{ .span = span, .kind = .or_ };
@@ -148,17 +144,17 @@ fn tokenizeSymbol(tokens: *Tokens) Token {
 fn tokenizeOne(tokens: *Tokens, kind: Kind) Token {
     const begin = tokens.pos;
     advance(tokens, 1);
-    return .{ .kind = kind, .span = .{ .begin = begin, .end = tokens.pos } };
+    return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
 fn tokenizeOneOrTwo(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind) Token {
     const begin = tokens.pos;
     if (tokens.source.len > 1 and tokens.source[1] == second) {
         advance(tokens, 2);
-        return .{ .kind = kind2, .span = .{ .begin = begin, .end = tokens.pos } };
+        return .{ .kind = kind2, .span = .{ begin, tokens.pos } };
     }
     advance(tokens, 1);
-    return .{ .kind = kind, .span = .{ .begin = begin, .end = tokens.pos } };
+    return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
 fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, third: u8, kind3: Kind) Token {
@@ -166,20 +162,20 @@ fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, 
     if (tokens.source.len > 1) {
         if (tokens.source[1] == second) {
             advance(tokens, 2);
-            return .{ .kind = kind2, .span = .{ .begin = begin, .end = tokens.pos } };
+            return .{ .kind = kind2, .span = .{ begin, tokens.pos } };
         }
         if (tokens.source[1] == third) {
             advance(tokens, 2);
-            return .{ .kind = kind3, .span = .{ .begin = begin, .end = tokens.pos } };
+            return .{ .kind = kind3, .span = .{ begin, tokens.pos } };
         }
     }
     advance(tokens, 1);
-    return .{ .kind = kind, .span = .{ .begin = begin, .end = tokens.pos } };
+    return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
 pub const Tokens = struct {
     source: []const u8,
-    pos: Position = .{ .line = 0, .col = 0 },
+    pos: Position = .{ 0, 0 },
     peeked: ?Token = null,
 
     const Self = @This();
@@ -212,9 +208,9 @@ pub const Tokens = struct {
             '>' => return tokenizeOneOrTwo(self, .greater, '=', .greater_equal),
             '!' => return tokenizeOneOrTwo(self, .bang, '=', .bang_equal),
             '+' => return tokenizeOne(self, .plus),
-            '*' => return tokenizeOne(self, .times),
-            '/' => return tokenizeOne(self, .div),
-            '&' => return tokenizeOne(self, .ampersand),
+            '*' => return tokenizeOne(self, .star),
+            '/' => return tokenizeOne(self, .slash),
+            '\\' => return tokenizeOne(self, .backslash),
             '^' => return tokenizeOne(self, .caret),
             ',' => return tokenizeOne(self, .comma),
             ':' => return tokenizeOne(self, .colon),

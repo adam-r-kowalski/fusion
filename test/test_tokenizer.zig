@@ -29,26 +29,11 @@ test "symbols" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .{ .symbol = "text" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 14 } },
-            .kind = .{ .symbol = "camelCase" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 15 }, .end = .{ .line = 0, .col = 25 } },
-            .kind = .{ .symbol = "snake_case" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 26 }, .end = .{ .line = 0, .col = 36 } },
-            .kind = .{ .symbol = "PascalCase" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 37 }, .end = .{ .line = 0, .col = 41 } },
-            .kind = .{ .symbol = "😀" },
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 4 } }, .kind = .{ .symbol = "text" } },
+        .{ .span = .{ .{ 0, 5 }, .{ 0, 14 } }, .kind = .{ .symbol = "camelCase" } },
+        .{ .span = .{ .{ 0, 15 }, .{ 0, 25 } }, .kind = .{ .symbol = "snake_case" } },
+        .{ .span = .{ .{ 0, 26 }, .{ 0, 36 } }, .kind = .{ .symbol = "PascalCase" } },
+        .{ .span = .{ .{ 0, 37 }, .{ 0, 41 } }, .kind = .{ .symbol = "😀" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -59,30 +44,12 @@ test "ints" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .{ .int = "1" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .{ .int = "42" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 7 } },
-            .kind = .{ .int = "-9" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .{ .int = "0" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 12 } },
-            .kind = .{ .int = "-0" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 13 }, .end = .{ .line = 0, .col = 18 } },
-            .kind = .{ .int = "1_000" },
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .int = "1" } },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 4 } }, .kind = .{ .int = "42" } },
+        .{ .span = .{ .{ 0, 5 }, .{ 0, 7 } }, .kind = .{ .int = "-9" } },
+        .{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "0" } },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 12 } }, .kind = .{ .int = "-0" } },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 18 } }, .kind = .{ .int = "1_000" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -93,22 +60,10 @@ test "floats" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .{ .float = "3.14" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 8 } },
-            .kind = .{ .float = ".25" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 9 }, .end = .{ .line = 0, .col = 13 } },
-            .kind = .{ .float = "-.25" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 14 }, .end = .{ .line = 0, .col = 21 } },
-            .kind = .{ .float = "1_000.3" },
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 4 } }, .kind = .{ .float = "3.14" } },
+        .{ .span = .{ .{ 0, 5 }, .{ 0, 8 } }, .kind = .{ .float = ".25" } },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 13 } }, .kind = .{ .float = "-.25" } },
+        .{ .span = .{ .{ 0, 14 }, .{ 0, 21 } }, .kind = .{ .float = "1_000.3" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -119,30 +74,12 @@ test "braces brackets and parens" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .left_bracket,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 1 }, .end = .{ .line = 0, .col = 2 } },
-            .kind = .left_brace,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .left_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .right_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-            .kind = .right_brace,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .right_bracket,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .left_bracket },
+        .{ .span = .{ .{ 0, 1 }, .{ 0, 2 } }, .kind = .left_brace },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .left_paren },
+        .{ .span = .{ .{ 0, 3 }, .{ 0, 4 } }, .kind = .right_paren },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .right_brace },
+        .{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .right_bracket },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -153,30 +90,12 @@ test "comparison operators" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .less,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .greater,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .equal_equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .bang_equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 12 } },
-            .kind = .less_equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 13 }, .end = .{ .line = 0, .col = 15 } },
-            .kind = .greater_equal,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .less },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .greater },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .equal_equal },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .bang_equal },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 12 } }, .kind = .less_equal },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 15 } }, .kind = .greater_equal },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -187,26 +106,11 @@ test "math operators" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .plus,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .minus,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-            .kind = .times,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-            .kind = .div,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .caret,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .plus },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .dash },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .star },
+        .{ .span = .{ .{ 0, 6 }, .{ 0, 7 } }, .kind = .slash },
+        .{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .caret },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -217,48 +121,23 @@ test "boolean operators" {
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .not,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 7 } },
-            .kind = .and_,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
-            .kind = .or_,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .not },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 7 } }, .kind = .and_ },
+        .{ .span = .{ .{ 0, 8 }, .{ 0, 10 } }, .kind = .or_ },
     };
     try expectEqualTokens(expected, actual);
 }
 
-test "access operators" {
+test "misc operators" {
     const allocator = std.testing.allocator;
-    const source = "= . & -> <-";
+    const source = "= . -> <-";
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .dot,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-            .kind = .ampersand,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 8 } },
-            .kind = .right_arrow,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 9 }, .end = .{ .line = 0, .col = 11 } },
-            .kind = .left_arrow,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .equal },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .dot },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .left_arrow },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -266,41 +145,19 @@ test "access operators" {
 test "single line function" {
     const allocator = std.testing.allocator;
     const source =
-        \\main = () {
-        \\    42
-        \\}
+        \\double = \x -> x + x
     ;
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .{ .symbol = "main" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 8 } },
-            .kind = .left_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .right_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 11 } },
-            .kind = .left_brace,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 6 } },
-            .kind = .{ .int = "42" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 2, .col = 0 }, .end = .{ .line = 2, .col = 1 } },
-            .kind = .right_brace,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .plus },
+        .{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -308,173 +165,34 @@ test "single line function" {
 test "multi line function" {
     const allocator = std.testing.allocator;
     const source =
-        \\main = () {
-        \\    x = 10
-        \\    y = 25
-        \\    x + y
-        \\}
+        \\double = \x ->
+        \\    x + x
     ;
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .{ .symbol = "main" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 8 } },
-            .kind = .left_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .right_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 11 } },
-            .kind = .left_brace,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
-            .kind = .{ .symbol = "x" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 10 } },
-            .kind = .{ .int = "10" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 5 } },
-            .kind = .{ .symbol = "y" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 2, .col = 6 }, .end = .{ .line = 2, .col = 7 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 2, .col = 8 }, .end = .{ .line = 2, .col = 10 } },
-            .kind = .{ .int = "25" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
-            .kind = .{ .symbol = "x" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 3, .col = 6 }, .end = .{ .line = 3, .col = 7 } },
-            .kind = .plus,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
-            .kind = .{ .symbol = "y" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 4, .col = 0 }, .end = .{ .line = 4, .col = 1 } },
-            .kind = .right_brace,
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .indent },
+        .{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .plus },
+        .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqualTokens(expected, actual);
 }
 
 test "function call" {
     const allocator = std.testing.allocator;
-    const source = "min(10, 20)";
+    const source = "min 10 20";
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .{ .symbol = "min" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 4 } },
-            .kind = .left_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .{ .int = "10" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-            .kind = .comma,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
-            .kind = .{ .int = "20" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 11 } },
-            .kind = .right_paren,
-        },
-    };
-    try expectEqualTokens(expected, actual);
-}
-
-test "ufcs function call" {
-    const allocator = std.testing.allocator;
-    const source = "10.min(20)";
-    const actual = try tokenizeAlloc(source, allocator);
-    defer allocator.free(actual);
-    const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 2 } },
-            .kind = .{ .int = "10" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-            .kind = .dot,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .{ .symbol = "min" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 0, .col = 7 } },
-            .kind = .left_paren,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 9 } },
-            .kind = .{ .int = "20" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 9 }, .end = .{ .line = 0, .col = 10 } },
-            .kind = .right_paren,
-        },
-    };
-    try expectEqualTokens(expected, actual);
-}
-
-test "variable with explicit type" {
-    const allocator = std.testing.allocator;
-    const source = "x: i32 = 10";
-    const actual = try tokenizeAlloc(source, allocator);
-    defer allocator.free(actual);
-    const expected: []const Token = &.{
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-            .kind = .{ .symbol = "x" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 1 }, .end = .{ .line = 0, .col = 2 } },
-            .kind = .colon,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 6 } },
-            .kind = .{ .symbol = "i32" },
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 8 } },
-            .kind = .equal,
-        },
-        .{
-            .span = .{ .begin = .{ .line = 0, .col = 9 }, .end = .{ .line = 0, .col = 11 } },
-            .kind = .{ .int = "10" },
-        },
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "min" } },
+        .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .{ .int = "20" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -482,18 +200,9 @@ test "variable with explicit type" {
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);
-    const x = .{
-        .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-        .kind = .{ .symbol = "x" },
-    };
-    const p = .{
-        .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-        .kind = .plus,
-    };
-    const y = .{
-        .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-        .kind = .{ .symbol = "y" },
-    };
+    const x = .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } };
+    const p = .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .plus };
+    const y = .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } };
     try expectEqualToken(tokens.peek().?, x);
     try expectEqualToken(tokens.peek().?, x);
     try expectEqualToken(tokens.next().?, x);
