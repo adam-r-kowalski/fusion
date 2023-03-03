@@ -3,24 +3,89 @@ const fusion = @import("fusion");
 const tokenize = fusion.tokenizer.tokenize;
 const tokenizeAlloc = fusion.tokenizer.tokenizeAlloc;
 const Token = fusion.tokenizer.Token;
+const Span = fusion.tokenizer.Span;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
-    switch (expected.kind) {
-        .symbol => |s| try std.testing.expectEqualStrings(s, actual.kind.symbol),
-        .int => |i| try std.testing.expectEqualStrings(i, actual.kind.int),
-        .float => |f| try std.testing.expectEqualStrings(f, actual.kind.float),
-        else => try std.testing.expectEqual(expected, actual),
-    }
-    try std.testing.expectEqual(expected.span, actual.span);
+    var actualString = std.ArrayList(u8).init(std.testing.allocator);
+    defer actualString.deinit();
+    try writeToken(actualString.writer(), actual);
+    var expectedString = std.ArrayList(u8).init(std.testing.allocator);
+    defer expectedString.deinit();
+    try writeToken(expectedString.writer(), expected);
+    try std.testing.expectEqualStrings(expectedString.items, actualString.items);
 }
 
 fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
-    var i: usize = 0;
-    const max = std.math.min(expected.len, actual.len);
-    while (i < max) : (i += 1) {
-        try expectEqualToken(expected[i], actual[i]);
+    var actualString = std.ArrayList(u8).init(std.testing.allocator);
+    defer actualString.deinit();
+    try writeTokens(actualString.writer(), actual);
+    var expectedString = std.ArrayList(u8).init(std.testing.allocator);
+    defer expectedString.deinit();
+    try writeTokens(expectedString.writer(), expected);
+    try std.testing.expectEqualStrings(expectedString.items, actualString.items);
+}
+
+fn writeSpan(writer: anytype, span: Span) !void {
+    const fmt = ".span = .{{ .{{ {}, {} }}, .{{ {}, {} }} }},";
+    try std.fmt.format(writer, fmt, .{
+        span[0][0],
+        span[0][1],
+        span[1][0],
+        span[1][1],
+    });
+}
+
+fn writeToken(writer: anytype, token: Token) !void {
+    try writer.writeAll("\n.{");
+    try writeSpan(writer, token.span);
+    try writer.writeAll(" .kind = ");
+    switch (token.kind) {
+        .symbol => |symbol| try std.fmt.format(writer, ".{{ .symbol = \"{s}\" }}", .{symbol}),
+        .int => |int| try std.fmt.format(writer, ".{{ .int = \"{s}\" }}", .{int}),
+        .float => |float| try std.fmt.format(writer, ".{{ .float = \"{s}\" }}", .{float}),
+        .left_bracket => try writer.writeAll(".left_bracket"),
+        .right_bracket => try writer.writeAll(".right_bracket"),
+        .left_brace => try writer.writeAll(".left_brace"),
+        .right_brace => try writer.writeAll(".right_brace"),
+        .left_paren => try writer.writeAll(".left_paren"),
+        .right_paren => try writer.writeAll(".right_paren"),
+        .equal => try writer.writeAll(".equal"),
+        .less => try writer.writeAll(".less"),
+        .greater => try writer.writeAll(".greater"),
+        .plus => try writer.writeAll(".plus"),
+        .dash => try writer.writeAll(".dash"),
+        .star => try writer.writeAll(".star"),
+        .slash => try writer.writeAll(".slash"),
+        .backslash => try writer.writeAll(".backslash"),
+        .dot => try writer.writeAll(".dot"),
+        .caret => try writer.writeAll(".caret"),
+        .not => try writer.writeAll(".not"),
+        .and_ => try writer.writeAll(".and_"),
+        .or_ => try writer.writeAll(".or_"),
+        .equal_equal => try writer.writeAll(".equal_equal"),
+        .less_equal => try writer.writeAll(".less_equal"),
+        .greater_equal => try writer.writeAll(".greater_equal"),
+        .comma => try writer.writeAll(".comma"),
+        .bang => try writer.writeAll(".bang"),
+        .bang_equal => try writer.writeAll(".bang_equal"),
+        .colon => try writer.writeAll(".colon"),
+        .left_arrow => try writer.writeAll(".left_arrow"),
+        .right_arrow => try writer.writeAll(".right_arrow"),
+        .fat_arrow => try writer.writeAll(".fat_arrow"),
+        .indent => try writer.writeAll(".indent"),
     }
-    try std.testing.expectEqual(expected.len, actual.len);
+    try writer.writeAll(" },");
+}
+
+fn writeTokens(writer: anytype, tokens: []const Token) !void {
+    for (tokens) |token| {
+        try writeToken(writer, token);
+    }
+}
+
+fn printTokens(tokens: []const Token) !void {
+    const writer = std.io.getStdOut().writer();
+    try writeTokens(writer, tokens);
 }
 
 test "symbols" {
@@ -178,8 +243,8 @@ test "multi line function" {
         .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .indent },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .plus },
-        .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 6 }, .{ 1, 7 } }, .kind = .plus },
+        .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqualTokens(expected, actual);
 }
@@ -193,6 +258,31 @@ test "function call" {
         .{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "min" } },
         .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
         .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .{ .int = "20" } },
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "function declaration" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\transpose : m=>n=>v -> n=>m=>v
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 9 } }, .kind = .{ .symbol = "transpose" } },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .colon },
+        .{ .span = .{ .{ 0, 12 }, .{ 0, 13 } }, .kind = .{ .symbol = "m" } },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 15 } }, .kind = .fat_arrow },
+        .{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "n" } },
+        .{ .span = .{ .{ 0, 16 }, .{ 0, 18 } }, .kind = .fat_arrow },
+        .{ .span = .{ .{ 0, 18 }, .{ 0, 19 } }, .kind = .{ .symbol = "v" } },
+        .{ .span = .{ .{ 0, 20 }, .{ 0, 22 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 23 }, .{ 0, 24 } }, .kind = .{ .symbol = "n" } },
+        .{ .span = .{ .{ 0, 24 }, .{ 0, 26 } }, .kind = .fat_arrow },
+        .{ .span = .{ .{ 0, 26 }, .{ 0, 27 } }, .kind = .{ .symbol = "m" } },
+        .{ .span = .{ .{ 0, 27 }, .{ 0, 29 } }, .kind = .fat_arrow },
+        .{ .span = .{ .{ 0, 29 }, .{ 0, 30 } }, .kind = .{ .symbol = "v" } },
     };
     try expectEqualTokens(expected, actual);
 }

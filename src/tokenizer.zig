@@ -33,6 +33,7 @@ pub const Kind = union(enum) {
     colon,
     left_arrow,
     right_arrow,
+    fat_arrow,
     indent,
 };
 
@@ -55,6 +56,8 @@ fn trim(tokens: *Tokens) void {
             '\n' => {
                 tokens.pos[0] += 1;
                 tokens.pos[1] = 0;
+                i += 1;
+                break;
             },
             else => break,
         }
@@ -173,6 +176,14 @@ fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, 
     return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
+fn tokenizeIndent(tokens: *Tokens) Token {
+    const begin = tokens.pos;
+    var i: usize = 0;
+    while (i < tokens.source.len and tokens.source[i] == ' ') : (i += 1) {}
+    advance(tokens, i);
+    return .{ .kind = .indent, .span = .{ begin, tokens.pos } };
+}
+
 pub const Tokens = struct {
     source: []const u8,
     pos: Position = .{ 0, 0 },
@@ -203,7 +214,7 @@ pub const Tokens = struct {
             '}' => return tokenizeOne(self, .right_brace),
             '(' => return tokenizeOne(self, .left_paren),
             ')' => return tokenizeOne(self, .right_paren),
-            '=' => return tokenizeOneOrTwo(self, .equal, '=', .equal_equal),
+            '=' => return tokenizeOneOrTwoChoice(self, .equal, '=', .equal_equal, '>', .fat_arrow),
             '<' => return tokenizeOneOrTwoChoice(self, .less, '=', .less_equal, '-', .left_arrow),
             '>' => return tokenizeOneOrTwo(self, .greater, '=', .greater_equal),
             '!' => return tokenizeOneOrTwo(self, .bang, '=', .bang_equal),
@@ -214,6 +225,7 @@ pub const Tokens = struct {
             '^' => return tokenizeOne(self, .caret),
             ',' => return tokenizeOne(self, .comma),
             ':' => return tokenizeOne(self, .colon),
+            ' ' => return tokenizeIndent(self),
             else => return tokenizeSymbol(self),
         }
     }
