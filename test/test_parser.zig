@@ -64,6 +64,25 @@ fn writeBinaryOp(writer: anytype, op: BinaryOp, indent: usize) !void {
     try writer.writeAll("},");
 }
 
+fn writeCall(writer: anytype, call: Call, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".call = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".func = &");
+    try writeExpression(writer, call.func.*, indent + 3, false);
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".args = &.{");
+    for (call.args) |arg| {
+        try writeExpression(writer, arg, indent + 4, true);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
 fn writeExpression(writer: anytype, expression: Expression, indent: usize, newline: bool) error{OutOfMemory}!void {
     if (newline) try writeIndent(writer, indent);
     try writer.writeAll(".{");
@@ -75,6 +94,7 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
         .symbol => |s| try std.fmt.format(writer, ".symbol = \"{s}\" }},", .{s}),
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
         .binary_op => |op| try writeBinaryOp(writer, op, indent),
+        .call => |call| try writeCall(writer, call, indent),
     }
     try writeIndent(writer, indent);
     try writer.writeAll("},");
@@ -87,8 +107,11 @@ fn writeExpressions(writer: anytype, expressions: []const Expression) !void {
 }
 
 fn printAst(ast: Ast) !void {
-    const writer = std.io.getStdOut().writer();
+    var list = std.ArrayList(u8).init(std.testing.allocator);
+    defer list.deinit();
+    const writer = list.writer();
     try writeExpressions(writer, ast.expressions);
+    std.debug.print("{s}", .{list.items});
 }
 
 test "symbol" {
@@ -196,29 +219,29 @@ test "operator precedence higher first" {
     try expectEqualExpressions(expected, ast.expressions);
 }
 
-// test "function call" {
-//     const allocator = std.testing.allocator;
-//     const source = "min 10 20";
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .{ 0, 3 }, .{ 0, 11 } },
-//             .kind = .{
-//                 .call = .{
-//                     .func = &.{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "min" } },
-//                     .args = &.{
-//                         .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
-//                         .{ .span = .{ .{ 0, 8 }, .{ 0, 10 } }, .kind = .{ .int = "20" } },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
+test "function call" {
+    const allocator = std.testing.allocator;
+    const source = "min 10 20";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 0, 9 } },
+            .kind = .{
+                .call = .{
+                    .func = &.{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "min" } },
+                    .args = &.{
+                        .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
+                        .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .{ .int = "20" } },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
 // test "variable declaration" {
 //     const allocator = std.testing.allocator;
 //     const source = "x = 5";

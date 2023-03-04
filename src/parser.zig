@@ -20,10 +20,16 @@ pub const BinaryOp = struct {
     right: *const Expression,
 };
 
+pub const Call = struct {
+    func: *const Expression,
+    args: []const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
     binary_op: BinaryOp,
+    call: Call,
 };
 
 pub const Expression = struct {
@@ -52,7 +58,7 @@ fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{
     const token = tokens.next().?;
     var left = try prefixParser(token);
     while (true) {
-        if (infixParser(tokens)) |parser| {
+        if (infixParser(tokens, left)) |parser| {
             const nextPrecedence = parserPrecedence(parser);
             if (precedence <= nextPrecedence) {
                 left = try runParser(parser, allocator, tokens, left, nextPrecedence);
@@ -78,15 +84,19 @@ fn prefixParser(token: Token) !Expression {
 
 const InfixParser = union(enum) {
     binary_op: BinaryOpKind,
+    call,
 };
 
-fn infixParser(tokens: *Tokens) ?InfixParser {
+fn infixParser(tokens: *Tokens, left: Expression) ?InfixParser {
     if (tokens.peek()) |token| {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
             .equal => return .{ .binary_op = .assign },
-            else => return null,
+            else => {
+                if (left.kind == .symbol) return .call;
+                return null;
+            },
         }
     } else {
         return null;
@@ -105,6 +115,21 @@ fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: B
     };
 }
 
+fn parseCall(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
+    const func = try allocator.create(Expression);
+    func.* = lhs;
+    var args = std.ArrayList(Expression).init(allocator);
+    while (tokens.peek()) |token| {
+        if (token.kind == .new_line) break;
+        const arg = try parseExpression(allocator, tokens, LOWEST);
+        try args.append(arg);
+    }
+    return .{
+        .span = .{ lhs.span[0], args.items[args.items.len - 1].span[1] },
+        .kind = .{ .call = .{ .func = func, .args = args.toOwnedSlice() } },
+    };
+}
+
 fn runParser(
     parser: InfixParser,
     allocator: Allocator,
@@ -114,6 +139,7 @@ fn runParser(
 ) !Expression {
     switch (parser) {
         .binary_op => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
+        .call => return parseCall(allocator, tokens, left),
     }
 }
 
@@ -133,5 +159,6 @@ fn parserPrecedence(parser: InfixParser) u8 {
                 .assign => return ASSIGN,
             }
         },
+        .call => return CALL,
     }
 }
