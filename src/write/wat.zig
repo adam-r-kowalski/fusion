@@ -94,17 +94,17 @@ fn data(writer: anytype, d: Data) !void {
     try std.fmt.format(writer, fmt, .{ d[0], d[1] });
 }
 
-fn watTable(t: Table, writer: anytype) !void {
+fn table(writer: anytype, t: Table) !void {
     const fmt = "\n\n    (table ${s} {} funcref)";
-    try std.fmt.format(writer, fmt, .{ t.name, t.initial });
+    try std.fmt.format(writer, fmt, .{ t[0], t[1] });
 }
 
-fn watElem(e: Elem, writer: anytype) !void {
+fn elem(writer: anytype, e: Elem) !void {
     const fmt = "\n\n    (elem (i32.const {}) ${s})";
-    try std.fmt.format(writer, fmt, .{ e.offset, e.name });
+    try std.fmt.format(writer, fmt, .{ e[0], e[1] });
 }
 
-fn watFuncType(f: FuncType, writer: anytype) !void {
+fn funcType(writer: anytype, f: FuncType) !void {
     const fmt = "\n\n    (type ${s} (func";
     try std.fmt.format(writer, fmt, .{f.name});
     if (f.params.len > 0) {
@@ -236,9 +236,9 @@ pub fn wat(writer: anytype, module: []const TopLevel) !void {
             .memory => |m| try memory(writer, m),
             .global => |g| try global(writer, g),
             .data => |d| try data(writer, d),
-            .table => |t| try watTable(t, writer),
-            .elem => |e| try watElem(e, writer),
-            .functype => |f| try watFuncType(f, writer),
+            .table => |t| try table(writer, t),
+            .elem => |e| try elem(writer, e),
+            .functype => |f| try funcType(writer, f),
             .func => |f| try func(writer, f),
             .export_ => |e| try export_(writer, e),
             .start => |name| try start(writer, name),

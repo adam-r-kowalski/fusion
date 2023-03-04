@@ -35,16 +35,9 @@ pub const Global = std.meta.Tuple(&.{ []const u8, Mutable, Value });
 
 pub const Data = std.meta.Tuple(&.{ u32, []const u8 });
 
-pub const Table = struct {
-    name: []const u8,
-    initial: u32,
-    max: ?u32 = null,
-};
+pub const Table = std.meta.Tuple(&.{ []const u8, u32 });
 
-pub const Elem = struct {
-    offset: u32,
-    name: []const u8,
-};
+pub const Elem = std.meta.Tuple(&.{ u32, []const u8 });
 
 pub const FuncType = struct {
     name: []const u8,
