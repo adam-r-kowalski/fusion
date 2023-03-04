@@ -1,9 +1,11 @@
 const std = @import("std");
 const fusion = @import("fusion");
-const tokenize = fusion.tokenizer.tokenize;
-const tokenizeAlloc = fusion.tokenizer.tokenizeAlloc;
-const Token = fusion.tokenizer.Token;
-const Span = fusion.tokenizer.Span;
+const tokenize = fusion.tokenize.tokenize;
+const tokenizeAlloc = fusion.tokenize.tokenizeAlloc;
+const peekToken = fusion.tokenize.peekToken;
+const nextToken = fusion.tokenize.nextToken;
+const Token = fusion.types.token.Token;
+const Span = fusion.types.token.Span;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
     var actualString = std.ArrayList(u8).init(std.testing.allocator);
@@ -362,16 +364,16 @@ test "next and peek" {
     const x = .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } };
     const p = .{ .span = .{ .{ 0, 2 }, .{ 0, 3 } }, .kind = .plus };
     const y = .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } };
-    try expectEqualToken(tokens.peek().?, x);
-    try expectEqualToken(tokens.peek().?, x);
-    try expectEqualToken(tokens.next().?, x);
-    try expectEqualToken(tokens.peek().?, p);
-    try expectEqualToken(tokens.peek().?, p);
-    try expectEqualToken(tokens.next().?, p);
-    try expectEqualToken(tokens.peek().?, y);
-    try expectEqualToken(tokens.peek().?, y);
-    try expectEqualToken(tokens.next().?, y);
-    try std.testing.expectEqual(tokens.peek(), null);
-    try std.testing.expectEqual(tokens.peek(), null);
-    try std.testing.expectEqual(tokens.next(), null);
+    try expectEqualToken(peekToken(&tokens).?, x);
+    try expectEqualToken(peekToken(&tokens).?, x);
+    try expectEqualToken(nextToken(&tokens).?, x);
+    try expectEqualToken(peekToken(&tokens).?, p);
+    try expectEqualToken(peekToken(&tokens).?, p);
+    try expectEqualToken(nextToken(&tokens).?, p);
+    try expectEqualToken(peekToken(&tokens).?, y);
+    try expectEqualToken(peekToken(&tokens).?, y);
+    try expectEqualToken(nextToken(&tokens).?, y);
+    try std.testing.expectEqual(peekToken(&tokens), null);
+    try std.testing.expectEqual(peekToken(&tokens), null);
+    try std.testing.expectEqual(nextToken(&tokens), null);
 }

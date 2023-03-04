@@ -2,16 +2,18 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
 
-const tokenizer = @import("./tokenizer.zig");
-const Tokens = tokenizer.Tokens;
-const Token = tokenizer.Token;
-const Position = tokenizer.Position;
-const TokenKind = tokenizer.Kind;
-pub const Span = tokenizer.Span;
-const ast = @import("./types/ast.zig");
-const Ast = ast.Ast;
-const Expression = ast.Expression;
-const BinaryOpKind = ast.BinaryOpKind;
+const types = @import("types.zig");
+const Tokens = types.token.Tokens;
+const Token = types.token.Token;
+const Position = types.token.Position;
+const TokenKind = types.token.Kind;
+pub const Span = types.token.Span;
+const Ast = types.ast.Ast;
+const Expression = types.ast.Expression;
+const BinaryOpKind = types.ast.BinaryOpKind;
+const tokenize = @import("tokenize.zig");
+const nextToken = tokenize.nextToken;
+const peekToken = tokenize.peekToken;
 
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
     var arena = Arena.init(allocator);
@@ -24,7 +26,7 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
 const Precedence = u8;
 
 fn expression(allocator: Allocator, tokens: *Tokens, p: Precedence) error{OutOfMemory}!Expression {
-    const token = tokens.next().?;
+    const token = nextToken(tokens).?;
     var left = try prefix(allocator, tokens, token);
     while (true) {
         if (infix(tokens, left)) |parser| {
@@ -53,7 +55,7 @@ fn prefix(allocator: Allocator, tokens: *Tokens, token: Token) !Expression {
 }
 
 fn expect(tokens: *Tokens, kind: TokenKind) Token {
-    const token = tokens.next().?;
+    const token = nextToken(tokens).?;
     std.debug.assert(std.meta.activeTag(token.kind) == std.meta.activeTag(kind));
     return token;
 }
@@ -64,7 +66,7 @@ fn last(exprs: std.ArrayList(Expression)) Expression {
 
 fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
     var params = std.ArrayList(Expression).init(allocator);
-    while (tokens.peek()) |token| {
+    while (peekToken(tokens)) |token| {
         if (token.kind == .right_arrow) break;
         const param = try expression(allocator, tokens, HIGHEST);
         try params.append(param);
@@ -111,7 +113,7 @@ fn precedence(parser: Infix) Precedence {
 }
 
 fn infix(tokens: *Tokens, left: Expression) ?Infix {
-    if (tokens.peek()) |token| {
+    if (peekToken(tokens)) |token| {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
@@ -127,7 +129,7 @@ fn infix(tokens: *Tokens, left: Expression) ?Infix {
 }
 
 fn binaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: BinaryOpKind, p: Precedence) !Expression {
-    const op = tokens.next().?;
+    const op = nextToken(tokens).?;
     const left = try allocator.create(Expression);
     left.* = lhs;
     const right = try allocator.create(Expression);
@@ -142,7 +144,7 @@ fn call(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
     const func = try allocator.create(Expression);
     func.* = lhs;
     var args = std.ArrayList(Expression).init(allocator);
-    while (tokens.peek()) |token| {
+    while (peekToken(tokens)) |token| {
         if (token.kind == .new_line) break;
         const arg = try expression(allocator, tokens, LOWEST);
         try args.append(arg);

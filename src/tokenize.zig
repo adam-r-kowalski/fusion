@@ -1,53 +1,11 @@
 const std = @import("std");
 const eql = std.mem.eql;
 
-pub const Kind = union(enum) {
-    symbol: []const u8,
-    int: []const u8,
-    float: []const u8,
-    left_bracket,
-    right_bracket,
-    left_brace,
-    right_brace,
-    left_paren,
-    right_paren,
-    equal,
-    less,
-    greater,
-    plus,
-    dash,
-    star,
-    slash,
-    backslash,
-    dot,
-    caret,
-    not,
-    and_,
-    or_,
-    equal_equal,
-    less_equal,
-    greater_equal,
-    comma,
-    bang,
-    bang_equal,
-    colon,
-    left_arrow,
-    right_arrow,
-    fat_arrow,
-    indent,
-    new_line,
-};
-
-/// row, col
-pub const Position = [2]usize;
-
-/// begin, end
-pub const Span = [2]Position;
-
-pub const Token = struct {
-    span: Span,
-    kind: Kind,
-};
+const token = @import("types/token.zig");
+const Tokens = token.Tokens;
+const Token = token.Token;
+const Span = token.Span;
+const Kind = token.Kind;
 
 fn trim(tokens: *Tokens) void {
     var i: usize = 0;
@@ -179,55 +137,46 @@ fn indent(tokens: *Tokens) Token {
     return .{ .kind = .indent, .span = .{ begin, tokens.pos } };
 }
 
-pub const Tokens = struct {
-    source: []const u8,
-    pos: Position = .{ 0, 0 },
-    peeked: ?Token = null,
-    expecting_indent: bool = true,
+pub fn nextToken(tokens: *Tokens) ?Token {
+    const t = peekToken(tokens);
+    tokens.peeked = null;
+    return t;
+}
 
-    const Self = @This();
+pub fn peekToken(tokens: *Tokens) ?Token {
+    if (tokens.peeked) |t| return t;
+    tokens.peeked = getToken(tokens);
+    return tokens.peeked;
+}
 
-    pub fn next(self: *Self) ?Token {
-        const token = self.peek();
-        self.peeked = null;
-        return token;
+fn getToken(tokens: *Tokens) ?Token {
+    if (!tokens.expecting_indent) trim(tokens);
+    tokens.expecting_indent = false;
+    if (tokens.source.len == 0) return null;
+    switch (tokens.source[0]) {
+        '0'...'9', '-', '.' => return number(tokens),
+        '[' => return exact(tokens, .left_bracket),
+        ']' => return exact(tokens, .right_bracket),
+        '{' => return exact(tokens, .left_brace),
+        '}' => return exact(tokens, .right_brace),
+        '(' => return exact(tokens, .left_paren),
+        ')' => return exact(tokens, .right_paren),
+        '=' => return choice(tokens, .equal, &.{ .{ '=', .equal_equal }, .{ '>', .fat_arrow } }),
+        '<' => return choice(tokens, .less, &.{ .{ '=', .less_equal }, .{ '-', .left_arrow } }),
+        '>' => return choice(tokens, .greater, &.{.{ '=', .greater_equal }}),
+        '!' => return choice(tokens, .bang, &.{.{ '=', .bang_equal }}),
+        '+' => return exact(tokens, .plus),
+        '*' => return exact(tokens, .star),
+        '/' => return exact(tokens, .slash),
+        '\\' => return exact(tokens, .backslash),
+        '^' => return exact(tokens, .caret),
+        ',' => return exact(tokens, .comma),
+        ':' => return exact(tokens, .colon),
+        ' ' => return indent(tokens),
+        '\n' => return newLine(tokens),
+        else => return symbol(tokens),
     }
-
-    pub fn peek(self: *Self) ?Token {
-        if (self.peeked) |token| return token;
-        self.peeked = self.getToken();
-        return self.peeked;
-    }
-
-    fn getToken(self: *Self) ?Token {
-        if (!self.expecting_indent) trim(self);
-        self.expecting_indent = false;
-        if (self.source.len == 0) return null;
-        switch (self.source[0]) {
-            '0'...'9', '-', '.' => return number(self),
-            '[' => return exact(self, .left_bracket),
-            ']' => return exact(self, .right_bracket),
-            '{' => return exact(self, .left_brace),
-            '}' => return exact(self, .right_brace),
-            '(' => return exact(self, .left_paren),
-            ')' => return exact(self, .right_paren),
-            '=' => return choice(self, .equal, &.{ .{ '=', .equal_equal }, .{ '>', .fat_arrow } }),
-            '<' => return choice(self, .less, &.{ .{ '=', .less_equal }, .{ '-', .left_arrow } }),
-            '>' => return choice(self, .greater, &.{.{ '=', .greater_equal }}),
-            '!' => return choice(self, .bang, &.{.{ '=', .bang_equal }}),
-            '+' => return exact(self, .plus),
-            '*' => return exact(self, .star),
-            '/' => return exact(self, .slash),
-            '\\' => return exact(self, .backslash),
-            '^' => return exact(self, .caret),
-            ',' => return exact(self, .comma),
-            ':' => return exact(self, .colon),
-            ' ' => return indent(self),
-            '\n' => return newLine(self),
-            else => return symbol(self),
-        }
-    }
-};
+}
 
 pub fn tokenize(source: []const u8) Tokens {
     return .{ .source = source };
@@ -236,8 +185,8 @@ pub fn tokenize(source: []const u8) Tokens {
 pub fn tokenizeAlloc(source: []const u8, allocator: std.mem.Allocator) ![]Token {
     var tokens = tokenize(source);
     var list = std.ArrayList(Token).init(allocator);
-    while (tokens.next()) |token| {
-        try list.append(token);
+    while (nextToken(&tokens)) |t| {
+        try list.append(t);
     }
     return list.toOwnedSlice();
 }

@@ -1,5 +1,5 @@
 const std = @import("std");
-pub const tokenizer = @import("tokenizer.zig");
+pub const tokenize = @import("tokenize.zig");
 pub const parse = @import("parse.zig").parse;
 pub const types = @import("types.zig");
 pub const web_assembly = @import("web_assembly.zig");

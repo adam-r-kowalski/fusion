@@ -1,8 +1,7 @@
 const std = @import("std");
 const Arena = std.heap.ArenaAllocator;
 
-const tokenizer = @import("../tokenizer.zig");
-pub const Span = tokenizer.Span;
+pub const Span = @import("token.zig").Span;
 
 pub const BinaryOpKind = enum {
     add,

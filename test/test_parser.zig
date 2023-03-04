@@ -1,6 +1,6 @@
 const std = @import("std");
 const fusion = @import("fusion");
-const tokenize = fusion.tokenizer.tokenize;
+const tokenize = fusion.tokenize.tokenize;
 const parse = fusion.parse;
 const Expression = fusion.types.ast.Expression;
 const Ast = fusion.types.ast.Ast;
