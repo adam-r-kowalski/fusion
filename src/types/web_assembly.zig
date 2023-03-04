@@ -8,10 +8,7 @@ pub const Type = enum {
     v128,
 };
 
-pub const Memory = struct {
-    name: []const u8,
-    initial: u32,
-};
+pub const Memory = std.meta.Tuple(&.{ []const u8, u32 });
 
 pub const Mutable = enum {
     mut,
@@ -36,10 +33,7 @@ const Value = union(enum) {
 
 pub const Global = std.meta.Tuple(&.{ []const u8, Mutable, Value });
 
-pub const Data = struct {
-    offset: u32,
-    bytes: []const u8,
-};
+pub const Data = std.meta.Tuple(&.{ u32, []const u8 });
 
 pub const Table = struct {
     name: []const u8,

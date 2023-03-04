@@ -25,7 +25,7 @@ fn watType(t: Type, writer: anytype) !void {
     }
 }
 
-fn import(i: Import, writer: anytype) !void {
+fn import(writer: anytype, i: Import) !void {
     const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
     try std.fmt.format(writer, fmt, .{ i[0][0], i[0][1] });
     switch (i[1]) {
@@ -62,17 +62,17 @@ fn import(i: Import, writer: anytype) !void {
             try writer.writeAll(")");
         },
         .memory => |m| {
-            try std.fmt.format(writer, "(memory ${s} {})", .{ m.name, m.initial });
+            try std.fmt.format(writer, "(memory ${s} {})", .{ m[0], m[1] });
         },
     }
     try writer.writeAll(")");
 }
 
-fn memory(m: Memory, writer: anytype) !void {
-    try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ m.name, m.initial });
+fn memory(writer: anytype, m: Memory) !void {
+    try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ m[0], m[1] });
 }
 
-fn globalType(g: Global, writer: anytype) !void {
+fn globalType(writer: anytype, g: Global) !void {
     if (g[1] == .mut) try writer.writeAll("(mut ");
     switch (g[2]) {
         .i32 => try writer.writeAll("i32"),
@@ -80,18 +80,18 @@ fn globalType(g: Global, writer: anytype) !void {
     if (g[1] == .mut) try writer.writeAll(")");
 }
 
-fn global(g: Global, writer: anytype) !void {
+fn global(writer: anytype, g: Global) !void {
     try std.fmt.format(writer, "\n\n    (global ${s} ", .{g[0]});
-    try globalType(g, writer);
+    try globalType(writer, g);
     switch (g[2]) {
         .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
     }
     try writer.writeAll(")");
 }
 
-fn watData(d: Data, writer: anytype) !void {
+fn data(writer: anytype, d: Data) !void {
     const fmt = "\n\n    (data (i32.const {}) \"{s}\")";
-    try std.fmt.format(writer, fmt, .{ d.offset, d.bytes });
+    try std.fmt.format(writer, fmt, .{ d[0], d[1] });
 }
 
 fn watTable(t: Table, writer: anytype) !void {
@@ -228,14 +228,14 @@ fn watStart(name: []const u8, writer: anytype) !void {
     try std.fmt.format(writer, "\n\n    (start ${s})", .{name});
 }
 
-pub fn wat(module: []const TopLevel, writer: anytype) !void {
+pub fn wat(writer: anytype, module: []const TopLevel) !void {
     try writer.writeAll("(module");
     for (module) |top_level| {
         switch (top_level) {
-            .import => |i| try import(i, writer),
-            .memory => |m| try memory(m, writer),
-            .global => |g| try global(g, writer),
-            .data => |d| try watData(d, writer),
+            .import => |i| try import(writer, i),
+            .memory => |m| try memory(writer, m),
+            .global => |g| try global(writer, g),
+            .data => |d| try data(writer, d),
             .table => |t| try watTable(t, writer),
             .elem => |e| try watElem(e, writer),
             .functype => |f| try watFuncType(f, writer),
@@ -249,6 +249,6 @@ pub fn wat(module: []const TopLevel, writer: anytype) !void {
 
 pub fn watAlloc(module: []const TopLevel, allocator: std.mem.Allocator) ![]const u8 {
     var list = std.ArrayList(u8).init(allocator);
-    try wat(module, list.writer());
+    try wat(list.writer(), module);
     return list.toOwnedSlice();
 }
