@@ -43,7 +43,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
     return switch (kind) {
         .add => ".add",
         .mul => ".mul",
-        .assign => ".assign",
+        .define => ".define",
     };
 }
 
@@ -242,33 +242,27 @@ test "function call" {
     try expectEqualExpressions(expected, ast.expressions);
 }
 
-// test "variable declaration" {
-//     const allocator = std.testing.allocator;
-//     const source = "x = 5";
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 2 }, .end = .{ .line = 0, .col = 3 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .assign,
-//                     .left = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
-//                         .kind = .{ .symbol = "x" },
-//                     },
-//                     .right = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-//                         .kind = .{ .int = "5" },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
+test "define" {
+    const allocator = std.testing.allocator;
+    const source = "x = 5";
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .define,
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .right = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .int = "5" } },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
 // test "single line function definition" {
 //     const allocator = std.testing.allocator;
 //     const source = "main = () { 42 }";

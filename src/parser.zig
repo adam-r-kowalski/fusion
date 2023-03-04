@@ -11,7 +11,7 @@ pub const Span = tokenizer.Span;
 pub const BinaryOpKind = enum {
     add,
     mul,
-    assign,
+    define,
 };
 
 pub const BinaryOp = struct {
@@ -49,12 +49,12 @@ pub const Ast = struct {
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
     var arena = Arena.init(allocator);
     var expressions = std.ArrayList(Expression).init(arena.allocator());
-    const expression = try parseExpression(arena.allocator(), tokens, 0);
-    try expressions.append(expression);
+    const expr = try expression(arena.allocator(), tokens, 0);
+    try expressions.append(expr);
     return .{ .arena = arena, .expressions = expressions.toOwnedSlice() };
 }
 
-fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOfMemory}!Expression {
+fn expression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOfMemory}!Expression {
     const token = tokens.next().?;
     var left = try prefixParser(token);
     while (true) {
@@ -92,7 +92,7 @@ fn infixParser(tokens: *Tokens, left: Expression) ?InfixParser {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
-            .equal => return .{ .binary_op = .assign },
+            .equal => return .{ .binary_op = .define },
             else => {
                 if (left.kind == .symbol) return .call;
                 return null;
@@ -103,25 +103,25 @@ fn infixParser(tokens: *Tokens, left: Expression) ?InfixParser {
     }
 }
 
-fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: BinaryOpKind, precedence: u8) !Expression {
+fn binaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: BinaryOpKind, precedence: u8) !Expression {
     const infix = tokens.next().?;
     const left = try allocator.create(Expression);
     left.* = lhs;
     const right = try allocator.create(Expression);
-    right.* = try parseExpression(allocator, tokens, precedence);
+    right.* = try expression(allocator, tokens, precedence);
     return .{
         .span = infix.span,
         .kind = .{ .binary_op = .{ .kind = kind, .left = left, .right = right } },
     };
 }
 
-fn parseCall(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
+fn call(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
     const func = try allocator.create(Expression);
     func.* = lhs;
     var args = std.ArrayList(Expression).init(allocator);
     while (tokens.peek()) |token| {
         if (token.kind == .new_line) break;
-        const arg = try parseExpression(allocator, tokens, LOWEST);
+        const arg = try expression(allocator, tokens, LOWEST);
         try args.append(arg);
     }
     return .{
@@ -138,14 +138,14 @@ fn runParser(
     precedence: u8,
 ) !Expression {
     switch (parser) {
-        .binary_op => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
-        .call => return parseCall(allocator, tokens, left),
+        .binary_op => |value| return binaryOp(allocator, tokens, left, value, precedence),
+        .call => return call(allocator, tokens, left),
     }
 }
 
 const LOWEST = 0;
-const ASSIGN = LOWEST;
-const ADD = ASSIGN + 1;
+const DEFINE = LOWEST;
+const ADD = DEFINE + 1;
 const MUL = ADD + 1;
 const CALL = MUL + 1;
 const HIGHEST = CALL + 1;
@@ -156,7 +156,7 @@ fn parserPrecedence(parser: InfixParser) u8 {
             switch (op) {
                 .add => return ADD,
                 .mul => return MUL,
-                .assign => return ASSIGN,
+                .define => return DEFINE,
             }
         },
         .call => return CALL,
