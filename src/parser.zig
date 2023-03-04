@@ -6,6 +6,7 @@ const tokenizer = @import("./tokenizer.zig");
 const Tokens = tokenizer.Tokens;
 const Token = tokenizer.Token;
 const Position = tokenizer.Position;
+const TokenKind = tokenizer.Kind;
 pub const Span = tokenizer.Span;
 
 pub const BinaryOpKind = enum {
@@ -25,11 +26,17 @@ pub const Call = struct {
     args: []const Expression,
 };
 
+pub const Lambda = struct {
+    params: []const Expression,
+    body: []const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
     binary_op: BinaryOp,
     call: Call,
+    lambda: Lambda,
 };
 
 pub const Expression = struct {
@@ -56,7 +63,7 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
 
 fn expression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOfMemory}!Expression {
     const token = tokens.next().?;
-    var left = try prefixParser(token);
+    var left = try prefixParser(allocator, tokens, token);
     while (true) {
         if (infixParser(tokens, left)) |parser| {
             const nextPrecedence = parserPrecedence(parser);
@@ -71,15 +78,38 @@ fn expression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOf
     }
 }
 
-fn prefixParser(token: Token) !Expression {
+fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression {
     switch (token.kind) {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
+        .backslash => return lambda(allocator, tokens, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
         },
     }
+}
+
+fn expect(tokens: *Tokens, kind: TokenKind) void {
+    const token = tokens.next().?;
+    std.debug.assert(std.meta.activeTag(token.kind) == std.meta.activeTag(kind));
+}
+
+fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
+    var params = std.ArrayList(Expression).init(allocator);
+    while (tokens.peek()) |token| {
+        if (token.kind == .right_arrow) break;
+        const param = try expression(allocator, tokens, HIGHEST);
+        try params.append(param);
+    }
+    expect(tokens, .right_arrow);
+    var body = std.ArrayList(Expression).init(allocator);
+    const expr = try expression(allocator, tokens, LOWEST);
+    try body.append(expr);
+    return .{ .span = .{ backslash.span[0], body.items[body.items.len - 1].span[1] }, .kind = .{ .lambda = .{
+        .params = params.toOwnedSlice(),
+        .body = body.toOwnedSlice(),
+    } } };
 }
 
 const InfixParser = union(enum) {

@@ -10,6 +10,7 @@ const Func = fusion.parser.Func;
 const Call = fusion.parser.Call;
 const Define = fusion.parser.Define;
 const Span = fusion.parser.Span;
+const Lambda = fusion.parser.Lambda;
 
 fn expectEqualExpressions(expected: []const Expression, actual: []const Expression) !void {
     var actualString = std.ArrayList(u8).init(std.testing.allocator);
@@ -83,6 +84,28 @@ fn writeCall(writer: anytype, call: Call, indent: usize) !void {
     try writer.writeAll("},");
 }
 
+fn writeLambda(writer: anytype, lambda: Lambda, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".lambda = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".params = &.{");
+    for (lambda.params) |arg| {
+        try writeExpression(writer, arg, indent + 4, true);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writer.writeAll(".body = &.{");
+    for (lambda.body) |expr| {
+        try writeExpression(writer, expr, indent + 4, true);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
 fn writeExpression(writer: anytype, expression: Expression, indent: usize, newline: bool) error{OutOfMemory}!void {
     if (newline) try writeIndent(writer, indent);
     try writer.writeAll(".{");
@@ -95,6 +118,7 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
         .binary_op => |op| try writeBinaryOp(writer, op, indent),
         .call => |call| try writeCall(writer, call, indent),
+        .lambda => |lambda| try writeLambda(writer, lambda, indent),
     }
     try writeIndent(writer, indent);
     try writer.writeAll("},");
@@ -263,43 +287,48 @@ test "define" {
     try expectEqualExpressions(expected, ast.expressions);
 }
 
-// test "single line function definition" {
-//     const allocator = std.testing.allocator;
-//     const source = "main = () { 42 }";
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 5 }, .end = .{ .line = 0, .col = 6 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .assign,
-//                     .left = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
-//                         .kind = .{ .symbol = "main" },
-//                     },
-//                     .right = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 16 } },
-//                         .kind = .{
-//                             .func = .{
-//                                 .params = &.{},
-//                                 .body = &.{
-//                                     .{
-//                                         .span = .{ .begin = .{ .line = 0, .col = 12 }, .end = .{ .line = 0, .col = 14 } },
-//                                         .kind = .{ .int = "42" },
-//                                     },
-//                                 },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
+test "single line function definition" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\double = \x -> x * 2
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 7 }, .{ 0, 8 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .define,
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+                    .right = &.{
+                        .span = .{ .{ 0, 9 }, .{ 0, 18 } },
+                        .kind = .{
+                            .lambda = .{
+                                .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
+                                .body = &.{
+                                    .{
+                                        .span = .{ .{ 0, 17 }, .{ 0, 18 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .kind = .mul,
+                                                .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
+                                                .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqualExpressions(expected, ast.expressions);
+}
+
 // test "multi line function definition" {
 //     const allocator = std.testing.allocator;
 //     const source =
