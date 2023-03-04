@@ -126,7 +126,7 @@ fn watFuncType(f: FuncType, writer: anytype) !void {
     try writer.writeAll("))");
 }
 
-fn funcParams(params: []const Param, writer: anytype) !void {
+fn funcParams(writer: anytype, params: []const Param) !void {
     for (params) |p| {
         try std.fmt.format(writer, " (param ${s} ", .{p[0]});
         try watType(p[1], writer);
@@ -134,7 +134,7 @@ fn funcParams(params: []const Param, writer: anytype) !void {
     }
 }
 
-fn watFuncResults(results: []const Type, writer: anytype) !void {
+fn funcResults(writer: anytype, results: []const Type) !void {
     for (results) |result| {
         try writer.writeAll(" (result ");
         try watType(result, writer);
@@ -150,8 +150,8 @@ fn watIndent(indent: u8, writer: anytype) !void {
     }
 }
 
-fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
-    for (ops) |op| {
+fn ops(writer: anytype, os: []const Op, indent: u8) !void {
+    for (os) |op| {
         try watIndent(indent, writer);
         switch (op) {
             .call => |value| try std.fmt.format(writer, "(call ${s})", .{value}),
@@ -171,25 +171,25 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
             .i32_eq => try writer.writeAll("i32.eq"),
             .i32_const => |value| try std.fmt.format(writer, "(i32.const {})", .{value}),
             .block => |b| {
-                try std.fmt.format(writer, "(block ${s}", .{b.name});
-                try watOps(b.ops, indent + 1, writer);
+                try std.fmt.format(writer, "(block ${s}", .{b[0]});
+                try ops(writer, b[1], indent + 1);
                 try writer.writeAll(")");
             },
             .loop => |l| {
-                try std.fmt.format(writer, "(loop ${s}", .{l.name});
-                try watOps(l.ops, indent + 1, writer);
+                try std.fmt.format(writer, "(loop ${s}", .{l[0]});
+                try ops(writer, l[1], indent + 1);
                 try writer.writeAll(")");
             },
             .if_ => |i| {
                 try writer.writeAll("(if");
                 try watIndent(indent + 1, writer);
                 try writer.writeAll("(then");
-                try watOps(i.then, indent + 2, writer);
+                try ops(writer, i.then, indent + 2);
                 try writer.writeAll(")");
                 if (i.else_.len > 0) {
                     try watIndent(indent + 1, writer);
                     try writer.writeAll("(else");
-                    try watOps(i.else_, indent + 2, writer);
+                    try ops(writer, i.else_, indent + 2);
                     try writer.writeAll(")");
                 }
                 try writer.writeAll(")");
@@ -205,15 +205,15 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
     }
 }
 
-fn watFunc(f: Func, writer: anytype) !void {
+fn func(writer: anytype, f: Func) !void {
     try std.fmt.format(writer, "\n\n    (func ${s}", .{f.name});
-    try funcParams(f.params, writer);
-    try watFuncResults(f.results, writer);
-    try watOps(f.ops, 2, writer);
+    try funcParams(writer, f.params);
+    try funcResults(writer, f.results);
+    try ops(writer, f.ops, 2);
     try writer.writeAll(")");
 }
 
-fn export_(e: Export, writer: anytype) !void {
+fn export_(writer: anytype, e: Export) !void {
     try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e[0]});
     switch (e[1]) {
         .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
@@ -224,7 +224,7 @@ fn export_(e: Export, writer: anytype) !void {
     try writer.writeAll(")");
 }
 
-fn watStart(name: []const u8, writer: anytype) !void {
+fn start(writer: anytype, name: []const u8) !void {
     try std.fmt.format(writer, "\n\n    (start ${s})", .{name});
 }
 
@@ -239,9 +239,9 @@ pub fn wat(writer: anytype, module: []const TopLevel) !void {
             .table => |t| try watTable(t, writer),
             .elem => |e| try watElem(e, writer),
             .functype => |f| try watFuncType(f, writer),
-            .func => |f| try watFunc(f, writer),
-            .export_ => |e| try export_(e, writer),
-            .start => |name| try watStart(name, writer),
+            .func => |f| try func(writer, f),
+            .export_ => |e| try export_(writer, e),
+            .start => |name| try start(writer, name),
         }
     }
     try writer.writeAll(")");

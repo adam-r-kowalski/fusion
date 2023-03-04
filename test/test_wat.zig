@@ -385,406 +385,344 @@ test "import memory" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-// test "module only memory" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "js", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{ .i32, .i32 }, .results = &.{} } },
-//             },
-//         },
-//         .{ .memory = .{ .name = "mem", .initial = 1 } },
-//         .{ .data = .{ .offset = 0, .bytes = "Hi" } },
-//         .{
-//             .func = .{
-//                 .name = "writeHi",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .i32_const = 0 },
-//                     .{ .i32_const = 2 },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .{ .export_ = .{ .name = "writeHi", .kind = .{ .func = "writeHi" } } },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "js" "log" (func $log (param i32 i32)))
-//         \\
-//         \\    (memory $mem 1)
-//         \\
-//         \\    (data (i32.const 0) "Hi")
-//         \\
-//         \\    (func $writeHi
-//         \\        (i32.const 0)
-//         \\        (i32.const 2)
-//         \\        (call $log))
-//         \\
-//         \\    (export "writeHi" (func $writeHi)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "export memory" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "js", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{ .i32, .i32 }, .results = &.{} } },
-//             },
-//         },
-//         .{ .memory = .{ .name = "mem", .initial = 1 } },
-//         .{ .data = .{ .offset = 0, .bytes = "Hi" } },
-//         .{
-//             .func = .{
-//                 .name = "writeHi",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .i32_const = 0 },
-//                     .{ .i32_const = 2 },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .{ .export_ = .{ .name = "writeHi", .kind = .{ .func = "writeHi" } } },
-//         .{ .export_ = .{ .name = "mem", .kind = .{ .memory = "mem" } } },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "js" "log" (func $log (param i32 i32)))
-//         \\
-//         \\    (memory $mem 1)
-//         \\
-//         \\    (data (i32.const 0) "Hi")
-//         \\
-//         \\    (func $writeHi
-//         \\        (i32.const 0)
-//         \\        (i32.const 2)
-//         \\        (call $log))
-//         \\
-//         \\    (export "writeHi" (func $writeHi))
-//         \\
-//         \\    (export "mem" (memory $mem)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "start function" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "logIt",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .i32_const = 13 },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .{ .start = "logIt" },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $logIt
-//         \\        (i32.const 13)
-//         \\        (call $log))
-//         \\
-//         \\    (start $logIt))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "local variables" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "main",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .local = .{ .name = "var", .type = .i32 } },
-//                     .{ .i32_const = 10 },
-//                     .{ .local_set = "var" },
-//                     .{ .local_get = "var" },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .{ .start = "main" },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $main
-//         \\        (local $var i32)
-//         \\        (i32.const 10)
-//         \\        (local.set $var)
-//         \\        (local.get $var)
-//         \\        (call $log))
-//         \\
-//         \\    (start $main))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "tee local variable" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "main",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .local = .{ .name = "var", .type = .i32 } },
-//                     .{ .i32_const = 10 },
-//                     .{ .local_tee = "var" },
-//                     .{ .call = "log" },
-//                 },
-//             },
-//         },
-//         .{ .start = "main" },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $main
-//         \\        (local $var i32)
-//         \\        (i32.const 10)
-//         \\        (local.tee $var)
-//         \\        (call $log))
-//         \\
-//         \\    (start $main))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "loop" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "main",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .local = .{ .name = "i", .type = .i32 } },
-//                     .{
-//                         .loop = .{
-//                             .name = "my_loop",
-//                             .ops = &.{
-//                                 // increment i
-//                                 .{ .local_get = "i" },
-//                                 .{ .i32_const = 1 },
-//                                 .i32_add,
-//                                 .{ .local_set = "i" },
-//                                 // log i
-//                                 .{ .local_get = "i" },
-//                                 .{ .call = "log" },
-//                                 // if i < 10 then loop
-//                                 .{ .local_get = "i" },
-//                                 .{ .i32_const = 10 },
-//                                 .i32_lt_s,
-//                                 .{ .br_if = "my_loop" },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//         .{ .start = "main" },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $main
-//         \\        (local $i i32)
-//         \\        (loop $my_loop
-//         \\            (local.get $i)
-//         \\            (i32.const 1)
-//         \\            i32.add
-//         \\            (local.set $i)
-//         \\            (local.get $i)
-//         \\            (call $log)
-//         \\            (local.get $i)
-//         \\            (i32.const 10)
-//         \\            i32.lt_s
-//         \\            (br_if $my_loop)))
-//         \\
-//         \\    (start $main))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "if then else" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "main",
-//                 .params = &.{},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{ .i32_const = 0 },
-//                     .{
-//                         .if_ = .{
-//                             .then = &.{
-//                                 .{ .i32_const = 1 },
-//                                 .{ .call = "log" },
-//                             },
-//                             .else_ = &.{
-//                                 .{ .i32_const = 0 },
-//                                 .{ .call = "log" },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//         .{ .start = "main" },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $main
-//         \\        (i32.const 0)
-//         \\        (if
-//         \\            (then
-//         \\                (i32.const 1)
-//         \\                (call $log))
-//         \\            (else
-//         \\                (i32.const 0)
-//         \\                (call $log))))
-//         \\
-//         \\    (start $main))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
-// test "block" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{
-//             .import = .{
-//                 .path = .{ "console", "log" },
-//                 .kind = .{ .func = .{ .name = "log", .params = &.{.i32}, .results = &.{} } },
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "log_if_not_100",
-//                 .params = &.{.{ .name = "num", .type = .i32 }},
-//                 .results = &.{},
-//                 .ops = &.{
-//                     .{
-//                         .block = .{ .name = "my_block", .ops = &.{
-//                             .{ .local_get = "num" },
-//                             .{ .i32_const = 100 },
-//                             .i32_eq,
-//                             .{
-//                                 .if_ = .{
-//                                     .then = &.{
-//                                         .{ .br = "my_block" },
-//                                     },
-//                                 },
-//                             },
-//                             .{ .local_get = "num" },
-//                             .{ .call = "log" },
-//                         } },
-//                     },
-//                 },
-//             },
-//         },
-//         .{ .export_ = .{ .name = "log_if_not_100", .kind = .{ .func = "log_if_not_100" } } },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (import "console" "log" (func $log (param i32)))
-//         \\
-//         \\    (func $log_if_not_100 (param $num i32)
-//         \\        (block $my_block
-//         \\            (local.get $num)
-//         \\            (i32.const 100)
-//         \\            i32.eq
-//         \\            (if
-//         \\                (then
-//         \\                    (br $my_block)))
-//         \\            (local.get $num)
-//         \\            (call $log)))
-//         \\
-//         \\    (export "log_if_not_100" (func $log_if_not_100)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
-//
+test "module only memory" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "js", "log" }, .{ .func = .{ .name = "log", .params = &.{ .i32, .i32 } } } } },
+        .{ .memory = .{ "mem", 1 } },
+        .{ .data = .{ 0, "Hi" } },
+        .{
+            .func = .{
+                .name = "writeHi",
+                .ops = &.{
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .export_ = .{ "writeHi", .{ .func = "writeHi" } } },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "js" "log" (func $log (param i32 i32)))
+        \\
+        \\    (memory $mem 1)
+        \\
+        \\    (data (i32.const 0) "Hi")
+        \\
+        \\    (func $writeHi
+        \\        (i32.const 0)
+        \\        (i32.const 2)
+        \\        (call $log))
+        \\
+        \\    (export "writeHi" (func $writeHi)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "export memory" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "js", "log" }, .{ .func = .{ .name = "log", .params = &.{ .i32, .i32 } } } } },
+        .{ .memory = .{ "mem", 1 } },
+        .{ .data = .{ 0, "Hi" } },
+        .{
+            .func = .{
+                .name = "writeHi",
+                .ops = &.{
+                    .{ .i32_const = 0 },
+                    .{ .i32_const = 2 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .export_ = .{ "writeHi", .{ .func = "writeHi" } } },
+        .{ .export_ = .{ "mem", .{ .memory = "mem" } } },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "js" "log" (func $log (param i32 i32)))
+        \\
+        \\    (memory $mem 1)
+        \\
+        \\    (data (i32.const 0) "Hi")
+        \\
+        \\    (func $writeHi
+        \\        (i32.const 0)
+        \\        (i32.const 2)
+        \\        (call $log))
+        \\
+        \\    (export "writeHi" (func $writeHi))
+        \\
+        \\    (export "mem" (memory $mem)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "start function" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "logIt",
+                .ops = &.{
+                    .{ .i32_const = 13 },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .start = "logIt" },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $logIt
+        \\        (i32.const 13)
+        \\        (call $log))
+        \\
+        \\    (start $logIt))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "local variables" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "main",
+                .ops = &.{
+                    .{ .local = .{ .name = "var", .type = .i32 } },
+                    .{ .i32_const = 10 },
+                    .{ .local_set = "var" },
+                    .{ .local_get = "var" },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .start = "main" },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $var i32)
+        \\        (i32.const 10)
+        \\        (local.set $var)
+        \\        (local.get $var)
+        \\        (call $log))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "tee local variable" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "main",
+                .ops = &.{
+                    .{ .local = .{ .name = "var", .type = .i32 } },
+                    .{ .i32_const = 10 },
+                    .{ .local_tee = "var" },
+                    .{ .call = "log" },
+                },
+            },
+        },
+        .{ .start = "main" },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $var i32)
+        \\        (i32.const 10)
+        \\        (local.tee $var)
+        \\        (call $log))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "loop" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "main",
+                .ops = &.{
+                    .{ .local = .{ .name = "i", .type = .i32 } },
+                    .{
+                        .loop = .{
+                            "my_loop", &.{
+                                // increment i
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 1 },
+                                .i32_add,
+                                .{ .local_set = "i" },
+                                // log i
+                                .{ .local_get = "i" },
+                                .{ .call = "log" },
+                                // if i < 10 then loop
+                                .{ .local_get = "i" },
+                                .{ .i32_const = 10 },
+                                .i32_lt_s,
+                                .{ .br_if = "my_loop" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{ .start = "main" },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (local $i i32)
+        \\        (loop $my_loop
+        \\            (local.get $i)
+        \\            (i32.const 1)
+        \\            i32.add
+        \\            (local.set $i)
+        \\            (local.get $i)
+        \\            (call $log)
+        \\            (local.get $i)
+        \\            (i32.const 10)
+        \\            i32.lt_s
+        \\            (br_if $my_loop)))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "if then else" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "main",
+                .ops = &.{
+                    .{ .i32_const = 0 },
+                    .{
+                        .if_ = .{
+                            .then = &.{
+                                .{ .i32_const = 1 },
+                                .{ .call = "log" },
+                            },
+                            .else_ = &.{
+                                .{ .i32_const = 0 },
+                                .{ .call = "log" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{ .start = "main" },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $main
+        \\        (i32.const 0)
+        \\        (if
+        \\            (then
+        \\                (i32.const 1)
+        \\                (call $log))
+        \\            (else
+        \\                (i32.const 0)
+        \\                (call $log))))
+        \\
+        \\    (start $main))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
+test "block" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .import = .{ .{ "console", "log" }, .{ .func = .{ .name = "log", .params = &.{.i32} } } } },
+        .{
+            .func = .{
+                .name = "log_if_not_100",
+                .params = &.{.{ "num", .i32 }},
+                .ops = &.{
+                    .{
+                        .block = .{ "my_block", &.{
+                            .{ .local_get = "num" },
+                            .{ .i32_const = 100 },
+                            .i32_eq,
+                            .{ .if_ = .{ .then = &.{.{ .br = "my_block" }} } },
+                            .{ .local_get = "num" },
+                            .{ .call = "log" },
+                        } },
+                    },
+                },
+            },
+        },
+        .{ .export_ = .{ "log_if_not_100", .{ .func = "log_if_not_100" } } },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (import "console" "log" (func $log (param i32)))
+        \\
+        \\    (func $log_if_not_100 (param $num i32)
+        \\        (block $my_block
+        \\            (local.get $num)
+        \\            (i32.const 100)
+        \\            i32.eq
+        \\            (if
+        \\                (then
+        \\                    (br $my_block)))
+        \\            (local.get $num)
+        \\            (call $log)))
+        \\
+        \\    (export "log_if_not_100" (func $log_if_not_100)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
+
 // test "unreachable" {
 //     const allocator = std.testing.allocator;
 //     const module = &.{

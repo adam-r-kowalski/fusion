@@ -67,14 +67,8 @@ pub const Op = union(enum) {
     i32_lt_s,
     i32_eq,
     i32_const: i32,
-    block: struct {
-        name: []const u8,
-        ops: []const Op,
-    },
-    loop: struct {
-        name: []const u8,
-        ops: []const Op,
-    },
+    block: std.meta.Tuple(&.{ []const u8, []const Op }),
+    loop: std.meta.Tuple(&.{ []const u8, []const Op }),
     if_: struct {
         then: []const Op,
         else_: []const Op = &.{},
