@@ -12,7 +12,6 @@ pub const Span = tokenizer.Span;
 pub const BinaryOpKind = enum {
     add,
     mul,
-    define,
 };
 
 pub const BinaryOp = struct {
@@ -26,6 +25,11 @@ pub const Call = struct {
     args: []const Expression,
 };
 
+pub const Define = struct {
+    name: *const Expression,
+    body: []const Expression,
+};
+
 pub const Lambda = struct {
     params: []const Expression,
     body: []const Expression,
@@ -36,6 +40,7 @@ pub const Kind = union(enum) {
     int: []const u8,
     binary_op: BinaryOp,
     call: Call,
+    define: Define,
     lambda: Lambda,
 };
 
@@ -90,9 +95,10 @@ fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression
     }
 }
 
-fn expect(tokens: *Tokens, kind: TokenKind) void {
+fn expect(tokens: *Tokens, kind: TokenKind) Token {
     const token = tokens.next().?;
     std.debug.assert(std.meta.activeTag(token.kind) == std.meta.activeTag(kind));
+    return token;
 }
 
 fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
@@ -102,7 +108,7 @@ fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
         const param = try expression(allocator, tokens, HIGHEST);
         try params.append(param);
     }
-    expect(tokens, .right_arrow);
+    _ = expect(tokens, .right_arrow);
     var body = std.ArrayList(Expression).init(allocator);
     const expr = try expression(allocator, tokens, LOWEST);
     try body.append(expr);
@@ -115,6 +121,7 @@ fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
 const InfixParser = union(enum) {
     binary_op: BinaryOpKind,
     call,
+    define,
 };
 
 fn infixParser(tokens: *Tokens, left: Expression) ?InfixParser {
@@ -122,7 +129,7 @@ fn infixParser(tokens: *Tokens, left: Expression) ?InfixParser {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
-            .equal => return .{ .binary_op = .define },
+            .equal => return .define,
             else => {
                 if (left.kind == .symbol) return .call;
                 return null;
@@ -160,6 +167,24 @@ fn call(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
     };
 }
 
+fn define(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
+    const equal = expect(tokens, .equal);
+    const name = try allocator.create(Expression);
+    name.* = lhs;
+    var body = std.ArrayList(Expression).init(allocator);
+    const expr = try expression(allocator, tokens, LOWEST);
+    try body.append(expr);
+    return .{
+        .span = equal.span,
+        .kind = .{
+            .define = .{
+                .name = name,
+                .body = body.toOwnedSlice(),
+            },
+        },
+    };
+}
+
 fn runParser(
     parser: InfixParser,
     allocator: Allocator,
@@ -170,6 +195,7 @@ fn runParser(
     switch (parser) {
         .binary_op => |value| return binaryOp(allocator, tokens, left, value, precedence),
         .call => return call(allocator, tokens, left),
+        .define => return define(allocator, tokens, left),
     }
 }
 
@@ -186,9 +212,9 @@ fn parserPrecedence(parser: InfixParser) u8 {
             switch (op) {
                 .add => return ADD,
                 .mul => return MUL,
-                .define => return DEFINE,
             }
         },
+        .define => return DEFINE,
         .call => return CALL,
     }
 }

@@ -44,7 +44,6 @@ fn opName(kind: BinaryOpKind) []const u8 {
     return switch (kind) {
         .add => ".add",
         .mul => ".mul",
-        .define => ".define",
     };
 }
 
@@ -75,6 +74,26 @@ fn writeCall(writer: anytype, call: Call, indent: usize) !void {
     try writer.writeAll(".args = &.{");
     for (call.args) |arg| {
         try writeExpression(writer, arg, indent + 4, true);
+    }
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll("},");
+    try writeIndent(writer, indent + 1);
+    try writer.writeAll("},");
+}
+
+fn writeDefine(writer: anytype, define: Define, indent: usize) !void {
+    try writeIndent(writer, indent + 2);
+    try writer.writeAll(".define = .{");
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll(".name = &.{");
+    try writeExpression(writer, define.name.*, indent + 3, false);
+    try writeIndent(writer, indent + 3);
+    try writer.writeAll("},");
+    try writer.writeAll(".body = &.{");
+    for (define.body) |expr| {
+        try writeExpression(writer, expr, indent + 4, true);
     }
     try writeIndent(writer, indent + 3);
     try writer.writeAll("},");
@@ -118,6 +137,7 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
         .binary_op => |op| try writeBinaryOp(writer, op, indent),
         .call => |call| try writeCall(writer, call, indent),
+        .define => |define| try writeDefine(writer, define, indent),
         .lambda => |lambda| try writeLambda(writer, lambda, indent),
     }
     try writeIndent(writer, indent);
@@ -276,10 +296,9 @@ test "define" {
         .{
             .span = .{ .{ 0, 2 }, .{ 0, 3 } },
             .kind = .{
-                .binary_op = .{
-                    .kind = .define,
-                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
-                    .right = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .int = "5" } },
+                .define = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .body = &.{.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .int = "5" } }},
                 },
             },
         },
@@ -299,22 +318,23 @@ test "single line function definition" {
         .{
             .span = .{ .{ 0, 7 }, .{ 0, 8 } },
             .kind = .{
-                .binary_op = .{
-                    .kind = .define,
-                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
-                    .right = &.{
-                        .span = .{ .{ 0, 9 }, .{ 0, 18 } },
-                        .kind = .{
-                            .lambda = .{
-                                .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
-                                .body = &.{
-                                    .{
-                                        .span = .{ .{ 0, 17 }, .{ 0, 18 } },
-                                        .kind = .{
-                                            .binary_op = .{
-                                                .kind = .mul,
-                                                .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
-                                                .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
+                .define = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 0, 9 }, .{ 0, 18 } },
+                            .kind = .{
+                                .lambda = .{
+                                    .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 0, 17 }, .{ 0, 18 } },
+                                            .kind = .{
+                                                .binary_op = .{
+                                                    .kind = .mul,
+                                                    .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
+                                                    .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
+                                                },
                                             },
                                         },
                                     },
