@@ -35,6 +35,7 @@ pub const Kind = union(enum) {
     right_arrow,
     fat_arrow,
     indent,
+    new_line,
 };
 
 /// row, col
@@ -53,12 +54,6 @@ fn trim(tokens: *Tokens) void {
     while (i < tokens.source.len) : (i += 1) {
         switch (tokens.source[i]) {
             ' ' => tokens.pos[1] += 1,
-            '\n' => {
-                tokens.pos[0] += 1;
-                tokens.pos[1] = 0;
-                i += 1;
-                break;
-            },
             else => break,
         }
     }
@@ -176,6 +171,15 @@ fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, 
     return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
+fn tokenizeNewLine(tokens: *Tokens) Token {
+    const begin = tokens.pos;
+    tokens.pos[0] += 1;
+    tokens.pos[1] = 0;
+    tokens.source = tokens.source[1..];
+    tokens.expecting_indent = true;
+    return .{ .kind = .new_line, .span = .{ begin, tokens.pos } };
+}
+
 fn tokenizeIndent(tokens: *Tokens) Token {
     const begin = tokens.pos;
     var i: usize = 0;
@@ -188,6 +192,7 @@ pub const Tokens = struct {
     source: []const u8,
     pos: Position = .{ 0, 0 },
     peeked: ?Token = null,
+    expecting_indent: bool = true,
 
     const Self = @This();
 
@@ -204,7 +209,8 @@ pub const Tokens = struct {
     }
 
     fn getToken(self: *Self) ?Token {
-        trim(self);
+        if (!self.expecting_indent) trim(self);
+        self.expecting_indent = false;
         if (self.source.len == 0) return null;
         switch (self.source[0]) {
             '0'...'9', '-', '.' => return tokenizeNumber(self),
@@ -226,6 +232,7 @@ pub const Tokens = struct {
             ',' => return tokenizeOne(self, .comma),
             ':' => return tokenizeOne(self, .colon),
             ' ' => return tokenizeIndent(self),
+            '\n' => return tokenizeNewLine(self),
             else => return tokenizeSymbol(self),
         }
     }

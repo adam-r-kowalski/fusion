@@ -73,6 +73,7 @@ fn writeToken(writer: anytype, token: Token) !void {
         .right_arrow => try writer.writeAll(".right_arrow"),
         .fat_arrow => try writer.writeAll(".fat_arrow"),
         .indent => try writer.writeAll(".indent"),
+        .new_line => try writer.writeAll(".new_line"),
     }
     try writer.writeAll(" },");
 }
@@ -241,6 +242,7 @@ test "multi line function" {
         .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 14 }, .{ 1, 0 } }, .kind = .new_line },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .indent },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 6 }, .{ 1, 7 } }, .kind = .plus },
@@ -283,6 +285,73 @@ test "function declaration" {
         .{ .span = .{ .{ 0, 26 }, .{ 0, 27 } }, .kind = .{ .symbol = "m" } },
         .{ .span = .{ .{ 0, 27 }, .{ 0, 29 } }, .kind = .fat_arrow },
         .{ .span = .{ .{ 0, 29 }, .{ 0, 30 } }, .kind = .{ .symbol = "v" } },
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "function declaration and definition" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\double : F32 -> F32
+        \\double = \x -> x * x
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .colon },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 12 } }, .kind = .{ .symbol = "F32" } },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 15 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 16 }, .{ 0, 19 } }, .kind = .{ .symbol = "F32" } },
+        .{ .span = .{ .{ 0, 19 }, .{ 1, 0 } }, .kind = .new_line },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 6 } }, .kind = .{ .symbol = "double" } },
+        .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .backslash },
+        .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 12 }, .{ 1, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 15 }, .{ 1, 16 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 17 }, .{ 1, 18 } }, .kind = .star },
+        .{ .span = .{ .{ 1, 19 }, .{ 1, 20 } }, .kind = .{ .symbol = "x" } },
+    };
+    try expectEqualTokens(expected, actual);
+}
+
+test "multiple indentations in one function" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\sumSquares = \x y ->
+        \\    x2 = x ^ 2
+        \\    y2 = y ^ 2
+        \\    x2 + y2
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 10 } }, .kind = .{ .symbol = "sumSquares" } },
+        .{ .span = .{ .{ 0, 11 }, .{ 0, 12 } }, .kind = .equal },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 14 } }, .kind = .backslash },
+        .{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "y" } },
+        .{ .span = .{ .{ 0, 18 }, .{ 0, 20 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 20 }, .{ 1, 0 } }, .kind = .new_line },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .indent },
+        .{ .span = .{ .{ 1, 4 }, .{ 1, 6 } }, .kind = .{ .symbol = "x2" } },
+        .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .caret },
+        .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .int = "2" } },
+        .{ .span = .{ .{ 1, 14 }, .{ 2, 0 } }, .kind = .new_line },
+        .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .indent },
+        .{ .span = .{ .{ 2, 4 }, .{ 2, 6 } }, .kind = .{ .symbol = "y2" } },
+        .{ .span = .{ .{ 2, 7 }, .{ 2, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 2, 9 }, .{ 2, 10 } }, .kind = .{ .symbol = "y" } },
+        .{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .caret },
+        .{ .span = .{ .{ 2, 13 }, .{ 2, 14 } }, .kind = .{ .int = "2" } },
+        .{ .span = .{ .{ 2, 14 }, .{ 3, 0 } }, .kind = .new_line },
+        .{ .span = .{ .{ 3, 0 }, .{ 3, 4 } }, .kind = .indent },
+        .{ .span = .{ .{ 3, 4 }, .{ 3, 6 } }, .kind = .{ .symbol = "x2" } },
+        .{ .span = .{ .{ 3, 7 }, .{ 3, 8 } }, .kind = .plus },
+        .{ .span = .{ .{ 3, 9 }, .{ 3, 11 } }, .kind = .{ .symbol = "y2" } },
     };
     try expectEqualTokens(expected, actual);
 }
