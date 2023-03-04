@@ -53,88 +53,11 @@ fn writeBinaryOp(writer: anytype, op: BinaryOp, indent: usize) !void {
     try writeIndent(writer, indent + 3);
     try std.fmt.format(writer, ".kind = {s},", .{opName(op.kind)});
     try writeIndent(writer, indent + 3);
-    try writer.writeAll(".lhs = &");
-    try writeExpression(writer, op.lhs.*, indent + 3, false);
+    try writer.writeAll(".left = &");
+    try writeExpression(writer, op.left.*, indent + 3, false);
     try writeIndent(writer, indent + 3);
-    try writer.writeAll(".rhs = &");
-    try writeExpression(writer, op.rhs.*, indent + 3, false);
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll("},");
-    try writeIndent(writer, indent + 1);
-    try writer.writeAll("},");
-}
-
-fn writeFunc(writer: anytype, func: Func, indent: usize) !void {
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll(".func = .{");
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".params = &.{");
-    for (func.params) |param| {
-        try writeIndent(writer, indent + 4);
-        try writer.writeAll(".param = .{");
-        try writeIndent(writer, indent + 5);
-        try std.fmt.format(writer, ".name = \"{s}\",", .{param.name});
-        if (param.type) |type_| {
-            try writeIndent(writer, indent + 5);
-            try writer.writeAll(".type = &");
-            try writeExpression(writer, type_, indent + 5, false);
-            try writeIndent(writer, indent + 4);
-            try writer.writeAll("},");
-        }
-    }
-    if (func.params.len > 0) try writeIndent(writer, indent + 3);
-    try writer.writeAll("},");
-    if (func.return_type) |return_type| {
-        try writeIndent(writer, indent + 3);
-        try writer.writeAll(".return_type = &");
-        try writeExpression(writer, return_type.*, indent + 3, false);
-    }
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".body = &.{");
-    for (func.body) |expr| {
-        try writeExpression(writer, expr, indent + 4, true);
-    }
-    if (func.body.len > 0) try writeIndent(writer, indent + 3);
-    try writer.writeAll("},");
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll("},");
-    try writeIndent(writer, indent + 1);
-    try writer.writeAll("},");
-}
-
-fn writeCall(writer: anytype, call: Call, indent: usize) !void {
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll(".call = .{");
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".func = &");
-    try writeExpression(writer, call.func.*, indent + 3, false);
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".args = &{");
-    for (call.args) |expr| {
-        try writeExpression(writer, expr, indent + 4, true);
-    }
-    if (call.args.len > 0) try writeIndent(writer, indent + 3);
-    try writer.writeAll("},");
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll("},");
-    try writeIndent(writer, indent + 1);
-    try writer.writeAll("},");
-}
-
-fn writeDefine(writer: anytype, define: Define, indent: usize) !void {
-    try writeIndent(writer, indent + 2);
-    try writer.writeAll(".define = .{");
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".name = &");
-    try writeExpression(writer, define.name.*, indent + 3, false);
-    if (define.type) |type_| {
-        try writeIndent(writer, indent + 3);
-        try writer.writeAll(".type = &");
-        try writeExpression(writer, type_.*, indent + 3, false);
-    }
-    try writeIndent(writer, indent + 3);
-    try writer.writeAll(".value = &");
-    try writeExpression(writer, define.value.*, indent + 3, false);
+    try writer.writeAll(".right = &");
+    try writeExpression(writer, op.right.*, indent + 3, false);
     try writeIndent(writer, indent + 2);
     try writer.writeAll("},");
     try writeIndent(writer, indent + 1);
@@ -152,9 +75,6 @@ fn writeExpression(writer: anytype, expression: Expression, indent: usize, newli
         .symbol => |s| try std.fmt.format(writer, ".symbol = \"{s}\" }},", .{s}),
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
         .binary_op => |op| try writeBinaryOp(writer, op, indent),
-        .func => |f| try writeFunc(writer, f, indent),
-        .call => |c| try writeCall(writer, c, indent),
-        .define => |d| try writeDefine(writer, d, indent),
     }
     try writeIndent(writer, indent);
     try writer.writeAll("},");
@@ -207,8 +127,8 @@ test "add two symbols" {
             .kind = .{
                 .binary_op = .{
                     .kind = .add,
-                    .lhs = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
-                    .rhs = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .right = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
                 },
             },
         },
@@ -228,14 +148,14 @@ test "operator precedence lower first" {
             .kind = .{
                 .binary_op = .{
                     .kind = .add,
-                    .lhs = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
-                    .rhs = &.{
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .right = &.{
                         .span = .{ .{ 0, 6 }, .{ 0, 7 } },
                         .kind = .{
                             .binary_op = .{
                                 .kind = .mul,
-                                .lhs = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
-                                .rhs = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                                .left = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                                .right = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
                             },
                         },
                     },
@@ -258,17 +178,17 @@ test "operator precedence higher first" {
             .kind = .{
                 .binary_op = .{
                     .kind = .add,
-                    .lhs = &.{
+                    .left = &.{
                         .span = .{ .{ 0, 2 }, .{ 0, 3 } },
                         .kind = .{
                             .binary_op = .{
                                 .kind = .mul,
-                                .lhs = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
-                                .rhs = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                                .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                                .right = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
                             },
                         },
                     },
-                    .rhs = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                    .right = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
                 },
             },
         },
@@ -278,28 +198,19 @@ test "operator precedence higher first" {
 
 // test "function call" {
 //     const allocator = std.testing.allocator;
-//     const source = "min(10, 20)";
+//     const source = "min 10 20";
 //     var tokens = tokenize(source);
 //     const ast = try parse(&tokens, allocator);
 //     defer ast.deinit();
 //     const expected: []const Expression = &.{
 //         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 3 }, .end = .{ .line = 0, .col = 11 } },
+//             .span = .{ .{ 0, 3 }, .{ 0, 11 } },
 //             .kind = .{
 //                 .call = .{
-//                     .func = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-//                         .kind = .{ .symbol = "min" },
-//                     },
+//                     .func = &.{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "min" } },
 //                     .args = &.{
-//                         .{
-//                             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 6 } },
-//                             .kind = .{ .int = "10" },
-//                         },
-//                         .{
-//                             .span = .{ .begin = .{ .line = 0, .col = 8 }, .end = .{ .line = 0, .col = 10 } },
-//                             .kind = .{ .int = "20" },
-//                         },
+//                         .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
+//                         .{ .span = .{ .{ 0, 8 }, .{ 0, 10 } }, .kind = .{ .int = "20" } },
 //                     },
 //                 },
 //             },
@@ -320,11 +231,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 1 } },
 //                         .kind = .{ .symbol = "x" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
 //                         .kind = .{ .int = "5" },
 //                     },
@@ -347,11 +258,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
 //                         .kind = .{ .symbol = "main" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 0, .col = 16 } },
 //                         .kind = .{
 //                             .func = .{
@@ -390,11 +301,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
 //                         .kind = .{ .symbol = "main" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 4, .col = 1 } },
 //                         .kind = .{
 //                             .func = .{
@@ -405,11 +316,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .assign,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
 //                                                     .kind = .{ .symbol = "x" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
 //                                                     .kind = .{ .int = "5" },
 //                                                 },
@@ -421,11 +332,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .assign,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 2, .col = 4 }, .end = .{ .line = 2, .col = 5 } },
 //                                                     .kind = .{ .symbol = "y" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 2, .col = 8 }, .end = .{ .line = 2, .col = 10 } },
 //                                                     .kind = .{ .int = "10" },
 //                                                 },
@@ -437,11 +348,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .add,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
 //                                                     .kind = .{ .symbol = "x" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
 //                                                     .kind = .{ .symbol = "y" },
 //                                                 },
@@ -475,11 +386,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
 //                         .kind = .{ .symbol = "add" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
 //                         .kind = .{
 //                             .func = .{
@@ -490,11 +401,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .add,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
 //                                                     .kind = .{ .symbol = "x" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
 //                                                     .kind = .{ .symbol = "y" },
 //                                                 },
@@ -528,11 +439,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
 //                         .kind = .{ .symbol = "add" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
 //                         .kind = .{
 //                             .func = .{
@@ -562,11 +473,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .add,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
 //                                                     .kind = .{ .symbol = "x" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
 //                                                     .kind = .{ .symbol = "y" },
 //                                                 },
@@ -602,11 +513,11 @@ test "operator precedence higher first" {
 //             .kind = .{
 //                 .binary_op = .{
 //                     .kind = .assign,
-//                     .lhs = &.{
+//                     .left = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 4 } },
 //                         .kind = .{ .symbol = "main" },
 //                     },
-//                     .rhs = &.{
+//                     .right = &.{
 //                         .span = .{ .begin = .{ .line = 0, .col = 7 }, .end = .{ .line = 4, .col = 1 } },
 //                         .kind = .{
 //                             .func = .{
@@ -659,11 +570,11 @@ test "operator precedence higher first" {
 //                                         .kind = .{
 //                                             .binary_op = .{
 //                                                 .kind = .add,
-//                                                 .lhs = &.{
+//                                                 .left = &.{
 //                                                     .span = .{ .begin = .{ .line = 3, .col = 4 }, .end = .{ .line = 3, .col = 5 } },
 //                                                     .kind = .{ .symbol = "x" },
 //                                                 },
-//                                                 .rhs = &.{
+//                                                 .right = &.{
 //                                                     .span = .{ .begin = .{ .line = 3, .col = 8 }, .end = .{ .line = 3, .col = 9 } },
 //                                                     .kind = .{ .symbol = "y" },
 //                                                 },

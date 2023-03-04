@@ -14,41 +14,16 @@ pub const BinaryOpKind = enum {
     assign,
 };
 
-pub const Param = struct {
-    name: []const u8,
-    type: ?Expression = null,
-};
-
 pub const BinaryOp = struct {
     kind: BinaryOpKind,
-    lhs: *const Expression,
-    rhs: *const Expression,
-};
-
-pub const Call = struct {
-    func: *const Expression,
-    args: []const Expression,
-};
-
-pub const Func = struct {
-    params: []const Param,
-    body: []const Expression,
-    return_type: ?*const Expression = null,
-};
-
-pub const Define = struct {
-    name: *const Expression,
-    type: ?*const Expression = null,
-    value: *const Expression,
+    left: *const Expression,
+    right: *const Expression,
 };
 
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
     binary_op: BinaryOp,
-    call: Call,
-    func: Func,
-    define: Define,
 };
 
 pub const Expression = struct {
@@ -75,7 +50,7 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
 
 fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{OutOfMemory}!Expression {
     const token = tokens.next().?;
-    var left = try prefixParser(allocator, tokens, token);
+    var left = try prefixParser(token);
     while (true) {
         if (infixParser(tokens)) |parser| {
             const nextPrecedence = parserPrecedence(parser);
@@ -90,11 +65,10 @@ fn parseExpression(allocator: Allocator, tokens: *Tokens, precedence: u8) error{
     }
 }
 
-fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression {
+fn prefixParser(token: Token) !Expression {
     switch (token.kind) {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
-        .left_paren => return try parseFunction(allocator, tokens, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -102,83 +76,8 @@ fn prefixParser(allocator: Allocator, tokens: *Tokens, token: Token) !Expression
     }
 }
 
-fn parseFunctionParams(allocator: Allocator, tokens: *Tokens) ![]const Param {
-    var params = std.ArrayList(Param).init(allocator);
-    while (tokens.peek()) |token| {
-        switch (token.kind) {
-            .right_paren => {
-                _ = tokens.next();
-                break;
-            },
-            .comma => _ = tokens.next(),
-            .symbol => |name| {
-                _ = tokens.next();
-                const type_ = blk: {
-                    if (tokens.peek()) |t| {
-                        if (t.kind == .colon) {
-                            _ = tokens.next();
-                            break :blk try parseExpression(allocator, tokens, HIGHEST);
-                        } else {
-                            break :blk null;
-                        }
-                    } else {
-                        break :blk null;
-                    }
-                };
-                const param: Param = .{ .name = name, .type = type_ };
-                try params.append(param);
-            },
-            else => unreachable,
-        }
-    }
-    return params.toOwnedSlice();
-}
-
-fn parseFunctionReturnType(allocator: Allocator, tokens: *Tokens) !?*const Expression {
-    if (tokens.peek()) |token| {
-        if (token.kind == .right_arrow) {
-            _ = tokens.next();
-            const return_type = try allocator.create(Expression);
-            return_type.* = try parseExpression(allocator, tokens, HIGHEST);
-            return return_type;
-        }
-    }
-    return null;
-}
-
-fn parseFunction(allocator: Allocator, tokens: *Tokens, left_paren: Token) !Expression {
-    const params = try parseFunctionParams(allocator, tokens);
-    const return_type = try parseFunctionReturnType(allocator, tokens);
-    std.debug.assert(tokens.next().?.kind == .left_brace);
-    var body = std.ArrayList(Expression).init(allocator);
-    while (tokens.peek()) |token| {
-        switch (token.kind) {
-            .right_brace => {
-                const right_brace = tokens.next().?;
-                return .{
-                    .span = .{ left_paren.span[0], right_brace.span[1] },
-                    .kind = .{
-                        .func = .{
-                            .params = params,
-                            .body = body.toOwnedSlice(),
-                            .return_type = return_type,
-                        },
-                    },
-                };
-            },
-            else => {
-                const expression = try parseExpression(allocator, tokens, 0);
-                try body.append(expression);
-            },
-        }
-    }
-    unreachable;
-}
-
 const InfixParser = union(enum) {
     binary_op: BinaryOpKind,
-    call,
-    define_or_range,
 };
 
 fn infixParser(tokens: *Tokens) ?InfixParser {
@@ -187,8 +86,6 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
             .equal => return .{ .binary_op = .assign },
-            .left_paren => return .call,
-            .colon => return .define_or_range,
             else => return null,
         }
     } else {
@@ -196,65 +93,15 @@ fn infixParser(tokens: *Tokens) ?InfixParser {
     }
 }
 
-fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, left: Expression, kind: BinaryOpKind, precedence: u8) !Expression {
+fn parseBinaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: BinaryOpKind, precedence: u8) !Expression {
     const infix = tokens.next().?;
-    const lhs = try allocator.create(Expression);
-    lhs.* = left;
-    const rhs = try allocator.create(Expression);
-    rhs.* = try parseExpression(allocator, tokens, precedence);
+    const left = try allocator.create(Expression);
+    left.* = lhs;
+    const right = try allocator.create(Expression);
+    right.* = try parseExpression(allocator, tokens, precedence);
     return .{
         .span = infix.span,
-        .kind = .{ .binary_op = .{ .kind = kind, .lhs = lhs, .rhs = rhs } },
-    };
-}
-
-fn parseCall(allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
-    const left_paren = tokens.next().?;
-    var arguments = std.ArrayList(Expression).init(allocator);
-    while (tokens.peek()) |token| {
-        switch (token.kind) {
-            .right_paren => {
-                _ = tokens.next();
-                const func = try allocator.create(Expression);
-                func.* = left;
-                return .{
-                    .span = .{ left_paren.span[0], token.span[1] },
-                    .kind = .{
-                        .call = .{
-                            .func = func,
-                            .args = arguments.toOwnedSlice(),
-                        },
-                    },
-                };
-            },
-            .comma => _ = tokens.next(),
-            else => {
-                const argument = try parseExpression(allocator, tokens, 0);
-                try arguments.append(argument);
-            },
-        }
-    }
-    unreachable;
-}
-
-fn parseDefineOrRange(allocator: Allocator, tokens: *Tokens, left: Expression) !Expression {
-    _ = tokens.next();
-    const name = try allocator.create(Expression);
-    name.* = left;
-    const type_ = try allocator.create(Expression);
-    type_.* = try parseExpression(allocator, tokens, HIGHEST);
-    std.debug.assert(tokens.next().?.kind == .equal);
-    const value = try allocator.create(Expression);
-    value.* = try parseExpression(allocator, tokens, LOWEST);
-    return .{
-        .span = .{ left.span[0], value.span[1] },
-        .kind = .{
-            .define = .{
-                .name = name,
-                .type = type_,
-                .value = value,
-            },
-        },
+        .kind = .{ .binary_op = .{ .kind = kind, .left = left, .right = right } },
     };
 }
 
@@ -267,8 +114,6 @@ fn runParser(
 ) !Expression {
     switch (parser) {
         .binary_op => |value| return parseBinaryOp(allocator, tokens, left, value, precedence),
-        .call => return parseCall(allocator, tokens, left),
-        .define_or_range => return try parseDefineOrRange(allocator, tokens, left),
     }
 }
 
@@ -288,7 +133,5 @@ fn parserPrecedence(parser: InfixParser) u8 {
                 .assign => return ASSIGN,
             }
         },
-        .call => return CALL,
-        .define_or_range => return HIGHEST,
     }
 }
