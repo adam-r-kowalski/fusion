@@ -65,7 +65,7 @@ fn advance(tokens: *Tokens, columns: usize) void {
     tokens.pos[1] += columns;
 }
 
-fn tokenizeNumber(tokens: *Tokens) Token {
+fn number(tokens: *Tokens) Token {
     const begin = tokens.pos;
     var i: usize = 1;
     var decimals: usize = if (tokens.source[0] == '.') 1 else 0;
@@ -83,7 +83,7 @@ fn tokenizeNumber(tokens: *Tokens) Token {
     const value = tokens.source[0..i];
     if (value.len == 1) {
         switch (value[0]) {
-            '-' => return tokenizeOneOrTwo(tokens, .dash, '>', .right_arrow),
+            '-' => return choice(tokens, .dash, &.{.{ '>', .right_arrow }}),
             '.' => {
                 advance(tokens, i);
                 return .{ .span = .{ begin, tokens.pos }, .kind = .dot };
@@ -126,7 +126,7 @@ fn reserved(char: u8) bool {
     };
 }
 
-fn tokenizeSymbol(tokens: *Tokens) Token {
+fn symbol(tokens: *Tokens) Token {
     const begin = tokens.pos;
     var i: usize = 1;
     while (i < tokens.source.len and !reserved(tokens.source[i])) : (i += 1) {}
@@ -139,39 +139,30 @@ fn tokenizeSymbol(tokens: *Tokens) Token {
     return .{ .span = span, .kind = .{ .symbol = value } };
 }
 
-fn tokenizeOne(tokens: *Tokens, kind: Kind) Token {
+fn exact(tokens: *Tokens, kind: Kind) Token {
     const begin = tokens.pos;
     advance(tokens, 1);
     return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
-fn tokenizeOneOrTwo(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind) Token {
-    const begin = tokens.pos;
-    if (tokens.source.len > 1 and tokens.source[1] == second) {
-        advance(tokens, 2);
-        return .{ .kind = kind2, .span = .{ begin, tokens.pos } };
-    }
-    advance(tokens, 1);
-    return .{ .kind = kind, .span = .{ begin, tokens.pos } };
-}
+const Choice = std.meta.Tuple(&.{ u8, Kind });
 
-fn tokenizeOneOrTwoChoice(tokens: *Tokens, kind: Kind, second: u8, kind2: Kind, third: u8, kind3: Kind) Token {
+fn choice(tokens: *Tokens, kind: Kind, choices: []const Choice) Token {
     const begin = tokens.pos;
     if (tokens.source.len > 1) {
-        if (tokens.source[1] == second) {
-            advance(tokens, 2);
-            return .{ .kind = kind2, .span = .{ begin, tokens.pos } };
-        }
-        if (tokens.source[1] == third) {
-            advance(tokens, 2);
-            return .{ .kind = kind3, .span = .{ begin, tokens.pos } };
+        const t = tokens.source[1];
+        for (choices) |c| {
+            if (t == c[0]) {
+                advance(tokens, 2);
+                return .{ .kind = c[1], .span = .{ begin, tokens.pos } };
+            }
         }
     }
     advance(tokens, 1);
     return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
-fn tokenizeNewLine(tokens: *Tokens) Token {
+fn newLine(tokens: *Tokens) Token {
     const begin = tokens.pos;
     tokens.pos[0] += 1;
     tokens.pos[1] = 0;
@@ -180,7 +171,7 @@ fn tokenizeNewLine(tokens: *Tokens) Token {
     return .{ .kind = .new_line, .span = .{ begin, tokens.pos } };
 }
 
-fn tokenizeIndent(tokens: *Tokens) Token {
+fn indent(tokens: *Tokens) Token {
     const begin = tokens.pos;
     var i: usize = 0;
     while (i < tokens.source.len and tokens.source[i] == ' ') : (i += 1) {}
@@ -213,27 +204,27 @@ pub const Tokens = struct {
         self.expecting_indent = false;
         if (self.source.len == 0) return null;
         switch (self.source[0]) {
-            '0'...'9', '-', '.' => return tokenizeNumber(self),
-            '[' => return tokenizeOne(self, .left_bracket),
-            ']' => return tokenizeOne(self, .right_bracket),
-            '{' => return tokenizeOne(self, .left_brace),
-            '}' => return tokenizeOne(self, .right_brace),
-            '(' => return tokenizeOne(self, .left_paren),
-            ')' => return tokenizeOne(self, .right_paren),
-            '=' => return tokenizeOneOrTwoChoice(self, .equal, '=', .equal_equal, '>', .fat_arrow),
-            '<' => return tokenizeOneOrTwoChoice(self, .less, '=', .less_equal, '-', .left_arrow),
-            '>' => return tokenizeOneOrTwo(self, .greater, '=', .greater_equal),
-            '!' => return tokenizeOneOrTwo(self, .bang, '=', .bang_equal),
-            '+' => return tokenizeOne(self, .plus),
-            '*' => return tokenizeOne(self, .star),
-            '/' => return tokenizeOne(self, .slash),
-            '\\' => return tokenizeOne(self, .backslash),
-            '^' => return tokenizeOne(self, .caret),
-            ',' => return tokenizeOne(self, .comma),
-            ':' => return tokenizeOne(self, .colon),
-            ' ' => return tokenizeIndent(self),
-            '\n' => return tokenizeNewLine(self),
-            else => return tokenizeSymbol(self),
+            '0'...'9', '-', '.' => return number(self),
+            '[' => return exact(self, .left_bracket),
+            ']' => return exact(self, .right_bracket),
+            '{' => return exact(self, .left_brace),
+            '}' => return exact(self, .right_brace),
+            '(' => return exact(self, .left_paren),
+            ')' => return exact(self, .right_paren),
+            '=' => return choice(self, .equal, &.{ .{ '=', .equal_equal }, .{ '>', .fat_arrow } }),
+            '<' => return choice(self, .less, &.{ .{ '=', .less_equal }, .{ '-', .left_arrow } }),
+            '>' => return choice(self, .greater, &.{.{ '=', .greater_equal }}),
+            '!' => return choice(self, .bang, &.{.{ '=', .bang_equal }}),
+            '+' => return exact(self, .plus),
+            '*' => return exact(self, .star),
+            '/' => return exact(self, .slash),
+            '\\' => return exact(self, .backslash),
+            '^' => return exact(self, .caret),
+            ',' => return exact(self, .comma),
+            ':' => return exact(self, .colon),
+            ' ' => return indent(self),
+            '\n' => return newLine(self),
+            else => return symbol(self),
         }
     }
 };
