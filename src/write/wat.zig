@@ -1,152 +1,19 @@
-// Web Assembly types and operations for generating wat (web assembly text format).
-// A writer is used throughout and represents any type which has a `writeAll` function
-// which takes a string ([] const u8). Examples of writers are files, arrays, etc.
-// This allows for no allocation writing to a file.
-
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 
-pub const Type = enum {
-    i32,
-    i64,
-    f32,
-    f64,
-    v128,
-};
-
-pub const Memory = struct {
-    name: []const u8,
-    initial: u32,
-    max: ?u32 = null,
-};
-
-pub const Mutable = enum {
-    mutable,
-    immutable,
-};
-
-pub const Import = struct {
-    path: [2][]const u8,
-    kind: union(enum) {
-        func: struct {
-            name: []const u8,
-            params: []const Type = &.{},
-            results: []const Type = &.{},
-        },
-        global: struct {
-            name: []const u8,
-            type: Type,
-            mut: Mutable = .immutable,
-        },
-        memory: Memory,
-    },
-};
-
-const Value = union(enum) {
-    i32: i32,
-};
-
-pub const Global = struct {
-    name: []const u8,
-    value: Value,
-    mut: Mutable = .immutable,
-};
-
-pub const Data = struct {
-    offset: u32,
-    bytes: []const u8,
-};
-
-pub const Table = struct {
-    name: []const u8,
-    initial: u32,
-    max: ?u32 = null,
-};
-
-pub const Elem = struct {
-    offset: u32,
-    name: []const u8,
-};
-
-pub const FuncType = struct {
-    name: []const u8,
-    params: []const Type = &.{},
-    results: []const Type = &.{},
-};
-
-pub const Param = struct {
-    name: []const u8,
-    type: Type,
-};
-
-pub const Op = union(enum) {
-    call: []const u8,
-    call_indirect: []const u8,
-    local: struct { name: []const u8, type: Type },
-    local_get: []const u8,
-    local_set: []const u8,
-    local_tee: []const u8,
-    global_get: []const u8,
-    global_set: []const u8,
-    i32_add,
-    i32_lt_s,
-    i32_eq,
-    i32_const: i32,
-    block: struct {
-        name: []const u8,
-        ops: []const Op,
-    },
-    loop: struct {
-        name: []const u8,
-        ops: []const Op,
-    },
-    if_: struct {
-        then: []const Op,
-        else_: []const Op = &.{},
-    },
-    br: []const u8,
-    br_if: []const u8,
-    unreachable_,
-    select,
-    nop,
-    return_,
-    drop,
-};
-
-pub const Local = struct {
-    name: []const u8,
-    type: Type,
-};
-
-pub const Func = struct {
-    name: []const u8,
-    params: []const Param = &.{},
-    results: []const Type = &.{},
-    ops: []const Op = &.{},
-};
-
-pub const Export = struct {
-    name: []const u8,
-    kind: union(enum) {
-        func: []const u8,
-        global: []const u8,
-        memory: []const u8,
-        table: []const u8,
-    },
-};
-
-pub const TopLevel = union(enum) {
-    import: Import,
-    memory: Memory,
-    global: Global,
-    data: Data,
-    table: Table,
-    elem: Elem,
-    functype: FuncType,
-    func: Func,
-    export_: Export,
-    start: []const u8,
-};
+const web_assembly = @import("../types.zig").web_assembly;
+const Type = web_assembly.Type;
+const Import = web_assembly.Import;
+const Memory = web_assembly.Memory;
+const Global = web_assembly.Global;
+const Data = web_assembly.Data;
+const Table = web_assembly.Table;
+const Elem = web_assembly.Elem;
+const FuncType = web_assembly.FuncType;
+const Param = web_assembly.Param;
+const Op = web_assembly.Op;
+const Func = web_assembly.Func;
+const Export = web_assembly.Export;
+const TopLevel = web_assembly.TopLevel;
 
 fn watType(t: Type, writer: anytype) !void {
     switch (t) {
@@ -380,7 +247,7 @@ pub fn wat(module: []const TopLevel, writer: anytype) !void {
     try writer.writeAll(")");
 }
 
-pub fn watAlloc(module: []const TopLevel, allocator: Allocator) ![]const u8 {
+pub fn watAlloc(module: []const TopLevel, allocator: std.mem.Allocator) ![]const u8 {
     var list = std.ArrayList(u8).init(allocator);
     try wat(module, list.writer());
     return list.toOwnedSlice();
