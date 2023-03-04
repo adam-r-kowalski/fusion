@@ -8,87 +8,21 @@ const Token = fusion.types.token.Token;
 const Span = fusion.types.token.Span;
 
 fn expectEqualToken(expected: Token, actual: Token) !void {
-    var actualString = std.ArrayList(u8).init(std.testing.allocator);
-    defer actualString.deinit();
-    try writeToken(actualString.writer(), actual);
-    var expectedString = std.ArrayList(u8).init(std.testing.allocator);
-    defer expectedString.deinit();
-    try writeToken(expectedString.writer(), expected);
-    try std.testing.expectEqualStrings(expectedString.items, actualString.items);
+    const allocator = std.testing.allocator;
+    const actualString = try fusion.write.tokens.tokenAlloc(actual, allocator);
+    defer allocator.free(actualString);
+    const expectedString = try fusion.write.tokens.tokenAlloc(expected, allocator);
+    defer allocator.free(expectedString);
+    try std.testing.expectEqualStrings(expectedString, actualString);
 }
 
-fn expectEqualTokens(expected: []const Token, actual: []const Token) !void {
-    var actualString = std.ArrayList(u8).init(std.testing.allocator);
-    defer actualString.deinit();
-    try writeTokens(actualString.writer(), actual);
-    var expectedString = std.ArrayList(u8).init(std.testing.allocator);
-    defer expectedString.deinit();
-    try writeTokens(expectedString.writer(), expected);
-    try std.testing.expectEqualStrings(expectedString.items, actualString.items);
-}
-
-fn writeSpan(writer: anytype, span: Span) !void {
-    const fmt = ".span = .{{ .{{ {}, {} }}, .{{ {}, {} }} }},";
-    try std.fmt.format(writer, fmt, .{
-        span[0][0],
-        span[0][1],
-        span[1][0],
-        span[1][1],
-    });
-}
-
-fn writeToken(writer: anytype, token: Token) !void {
-    try writer.writeAll("\n.{");
-    try writeSpan(writer, token.span);
-    try writer.writeAll(" .kind = ");
-    switch (token.kind) {
-        .symbol => |symbol| try std.fmt.format(writer, ".{{ .symbol = \"{s}\" }}", .{symbol}),
-        .int => |int| try std.fmt.format(writer, ".{{ .int = \"{s}\" }}", .{int}),
-        .float => |float| try std.fmt.format(writer, ".{{ .float = \"{s}\" }}", .{float}),
-        .left_bracket => try writer.writeAll(".left_bracket"),
-        .right_bracket => try writer.writeAll(".right_bracket"),
-        .left_brace => try writer.writeAll(".left_brace"),
-        .right_brace => try writer.writeAll(".right_brace"),
-        .left_paren => try writer.writeAll(".left_paren"),
-        .right_paren => try writer.writeAll(".right_paren"),
-        .equal => try writer.writeAll(".equal"),
-        .less => try writer.writeAll(".less"),
-        .greater => try writer.writeAll(".greater"),
-        .plus => try writer.writeAll(".plus"),
-        .dash => try writer.writeAll(".dash"),
-        .star => try writer.writeAll(".star"),
-        .slash => try writer.writeAll(".slash"),
-        .backslash => try writer.writeAll(".backslash"),
-        .dot => try writer.writeAll(".dot"),
-        .caret => try writer.writeAll(".caret"),
-        .not => try writer.writeAll(".not"),
-        .and_ => try writer.writeAll(".and_"),
-        .or_ => try writer.writeAll(".or_"),
-        .equal_equal => try writer.writeAll(".equal_equal"),
-        .less_equal => try writer.writeAll(".less_equal"),
-        .greater_equal => try writer.writeAll(".greater_equal"),
-        .comma => try writer.writeAll(".comma"),
-        .bang => try writer.writeAll(".bang"),
-        .bang_equal => try writer.writeAll(".bang_equal"),
-        .colon => try writer.writeAll(".colon"),
-        .left_arrow => try writer.writeAll(".left_arrow"),
-        .right_arrow => try writer.writeAll(".right_arrow"),
-        .fat_arrow => try writer.writeAll(".fat_arrow"),
-        .indent => try writer.writeAll(".indent"),
-        .new_line => try writer.writeAll(".new_line"),
-    }
-    try writer.writeAll(" },");
-}
-
-fn writeTokens(writer: anytype, tokens: []const Token) !void {
-    for (tokens) |token| {
-        try writeToken(writer, token);
-    }
-}
-
-fn printTokens(tokens: []const Token) !void {
-    const writer = std.io.getStdOut().writer();
-    try writeTokens(writer, tokens);
+fn expectEqual(expected: []const Token, actual: []const Token) !void {
+    const allocator = std.testing.allocator;
+    const actualString = try fusion.write.tokens.tokensAlloc(actual, allocator);
+    defer allocator.free(actualString);
+    const expectedString = try fusion.write.tokens.tokensAlloc(expected, allocator);
+    defer allocator.free(expectedString);
+    try std.testing.expectEqualStrings(expectedString, actualString);
 }
 
 test "symbols" {
@@ -103,7 +37,7 @@ test "symbols" {
         .{ .span = .{ .{ 0, 26 }, .{ 0, 36 } }, .kind = .{ .symbol = "PascalCase" } },
         .{ .span = .{ .{ 0, 37 }, .{ 0, 41 } }, .kind = .{ .symbol = "😀" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "ints" {
@@ -119,7 +53,7 @@ test "ints" {
         .{ .span = .{ .{ 0, 10 }, .{ 0, 12 } }, .kind = .{ .int = "-0" } },
         .{ .span = .{ .{ 0, 13 }, .{ 0, 18 } }, .kind = .{ .int = "1_000" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "floats" {
@@ -133,7 +67,7 @@ test "floats" {
         .{ .span = .{ .{ 0, 9 }, .{ 0, 13 } }, .kind = .{ .float = "-.25" } },
         .{ .span = .{ .{ 0, 14 }, .{ 0, 21 } }, .kind = .{ .float = "1_000.3" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "braces brackets and parens" {
@@ -149,7 +83,7 @@ test "braces brackets and parens" {
         .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .right_brace },
         .{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .right_bracket },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "comparison operators" {
@@ -165,7 +99,7 @@ test "comparison operators" {
         .{ .span = .{ .{ 0, 10 }, .{ 0, 12 } }, .kind = .less_equal },
         .{ .span = .{ .{ 0, 13 }, .{ 0, 15 } }, .kind = .greater_equal },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "math operators" {
@@ -180,7 +114,7 @@ test "math operators" {
         .{ .span = .{ .{ 0, 6 }, .{ 0, 7 } }, .kind = .slash },
         .{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .caret },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "boolean operators" {
@@ -193,7 +127,7 @@ test "boolean operators" {
         .{ .span = .{ .{ 0, 4 }, .{ 0, 7 } }, .kind = .and_ },
         .{ .span = .{ .{ 0, 8 }, .{ 0, 10 } }, .kind = .or_ },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "misc operators" {
@@ -207,7 +141,7 @@ test "misc operators" {
         .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .right_arrow },
         .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .left_arrow },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "single line function" {
@@ -227,7 +161,7 @@ test "single line function" {
         .{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .plus },
         .{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .symbol = "x" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "multi line function" {
@@ -250,7 +184,7 @@ test "multi line function" {
         .{ .span = .{ .{ 1, 6 }, .{ 1, 7 } }, .kind = .plus },
         .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .symbol = "x" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "function call" {
@@ -263,7 +197,7 @@ test "function call" {
         .{ .span = .{ .{ 0, 4 }, .{ 0, 6 } }, .kind = .{ .int = "10" } },
         .{ .span = .{ .{ 0, 7 }, .{ 0, 9 } }, .kind = .{ .int = "20" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "function declaration" {
@@ -288,7 +222,7 @@ test "function declaration" {
         .{ .span = .{ .{ 0, 27 }, .{ 0, 29 } }, .kind = .fat_arrow },
         .{ .span = .{ .{ 0, 29 }, .{ 0, 30 } }, .kind = .{ .symbol = "v" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "function declaration and definition" {
@@ -315,7 +249,7 @@ test "function declaration and definition" {
         .{ .span = .{ .{ 1, 17 }, .{ 1, 18 } }, .kind = .star },
         .{ .span = .{ .{ 1, 19 }, .{ 1, 20 } }, .kind = .{ .symbol = "x" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "multiple indentations in one function" {
@@ -355,7 +289,7 @@ test "multiple indentations in one function" {
         .{ .span = .{ .{ 3, 7 }, .{ 3, 8 } }, .kind = .plus },
         .{ .span = .{ .{ 3, 9 }, .{ 3, 11 } }, .kind = .{ .symbol = "y2" } },
     };
-    try expectEqualTokens(expected, actual);
+    try expectEqual(expected, actual);
 }
 
 test "next and peek" {
