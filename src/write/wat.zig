@@ -25,10 +25,10 @@ fn watType(t: Type, writer: anytype) !void {
     }
 }
 
-fn watImport(import: Import, writer: anytype) !void {
+fn import(i: Import, writer: anytype) !void {
     const fmt = "\n\n    (import \"{s}\" \"{s}\" ";
-    try std.fmt.format(writer, fmt, .{ import.path[0], import.path[1] });
-    switch (import.kind) {
+    try std.fmt.format(writer, fmt, .{ i[0][0], i[0][1] });
+    switch (i[1]) {
         .func => |f| {
             try std.fmt.format(writer, "(func ${s}", .{f.name});
             if (f.params.len > 0) {
@@ -50,14 +50,14 @@ fn watImport(import: Import, writer: anytype) !void {
             try writer.writeAll(")");
         },
         .global => |g| {
-            try std.fmt.format(writer, "(global ${s}", .{g.name});
-            if (g.mut == .mutable) {
+            try std.fmt.format(writer, "(global ${s}", .{g[0]});
+            if (g[1] == .mut) {
                 try writer.writeAll(" (mut ");
-                try watType(g.type, writer);
+                try watType(g[2], writer);
                 try writer.writeAll(")");
             } else {
                 try writer.writeAll(" ");
-                try watType(g.type, writer);
+                try watType(g[2], writer);
             }
             try writer.writeAll(")");
         },
@@ -68,22 +68,22 @@ fn watImport(import: Import, writer: anytype) !void {
     try writer.writeAll(")");
 }
 
-fn watMemory(m: Memory, writer: anytype) !void {
+fn memory(m: Memory, writer: anytype) !void {
     try std.fmt.format(writer, "\n\n    (memory ${s} {})", .{ m.name, m.initial });
 }
 
-fn watGlobalType(g: Global, writer: anytype) !void {
-    if (g.mut == .mutable) try writer.writeAll("(mut ");
-    switch (g.value) {
+fn globalType(g: Global, writer: anytype) !void {
+    if (g[1] == .mut) try writer.writeAll("(mut ");
+    switch (g[2]) {
         .i32 => try writer.writeAll("i32"),
     }
-    if (g.mut == .mutable) try writer.writeAll(")");
+    if (g[1] == .mut) try writer.writeAll(")");
 }
 
-fn watGlobal(g: Global, writer: anytype) !void {
-    try std.fmt.format(writer, "\n\n    (global ${s} ", .{g.name});
-    try watGlobalType(g, writer);
-    switch (g.value) {
+fn global(g: Global, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (global ${s} ", .{g[0]});
+    try globalType(g, writer);
+    switch (g[2]) {
         .i32 => |value| try std.fmt.format(writer, " (i32.const {})", .{value}),
     }
     try writer.writeAll(")");
@@ -126,10 +126,10 @@ fn watFuncType(f: FuncType, writer: anytype) !void {
     try writer.writeAll("))");
 }
 
-fn watFuncParams(params: []const Param, writer: anytype) !void {
+fn funcParams(params: []const Param, writer: anytype) !void {
     for (params) |p| {
-        try std.fmt.format(writer, " (param ${s} ", .{p.name});
-        try watType(p.type, writer);
+        try std.fmt.format(writer, " (param ${s} ", .{p[0]});
+        try watType(p[1], writer);
         try writer.writeAll(")");
     }
 }
@@ -207,15 +207,15 @@ fn watOps(ops: []const Op, indent: u8, writer: anytype) !void {
 
 fn watFunc(f: Func, writer: anytype) !void {
     try std.fmt.format(writer, "\n\n    (func ${s}", .{f.name});
-    try watFuncParams(f.params, writer);
+    try funcParams(f.params, writer);
     try watFuncResults(f.results, writer);
     try watOps(f.ops, 2, writer);
     try writer.writeAll(")");
 }
 
-fn watExport(e: Export, writer: anytype) !void {
-    try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e.name});
-    switch (e.kind) {
+fn export_(e: Export, writer: anytype) !void {
+    try std.fmt.format(writer, "\n\n    (export \"{s}\" ", .{e[0]});
+    switch (e[1]) {
         .func => |name| try std.fmt.format(writer, "(func ${s})", .{name}),
         .global => |name| try std.fmt.format(writer, "(global ${s})", .{name}),
         .memory => |name| try std.fmt.format(writer, "(memory ${s})", .{name}),
@@ -232,15 +232,15 @@ pub fn wat(module: []const TopLevel, writer: anytype) !void {
     try writer.writeAll("(module");
     for (module) |top_level| {
         switch (top_level) {
-            .import => |i| try watImport(i, writer),
-            .memory => |m| try watMemory(m, writer),
-            .global => |g| try watGlobal(g, writer),
+            .import => |i| try import(i, writer),
+            .memory => |m| try memory(m, writer),
+            .global => |g| try global(g, writer),
             .data => |d| try watData(d, writer),
             .table => |t| try watTable(t, writer),
             .elem => |e| try watElem(e, writer),
             .functype => |f| try watFuncType(f, writer),
             .func => |f| try watFunc(f, writer),
-            .export_ => |e| try watExport(e, writer),
+            .export_ => |e| try export_(e, writer),
             .start => |name| try watStart(name, writer),
         }
     }

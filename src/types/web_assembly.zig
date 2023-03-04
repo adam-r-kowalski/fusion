@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Type = enum {
     i32,
     i64,
@@ -9,40 +11,30 @@ pub const Type = enum {
 pub const Memory = struct {
     name: []const u8,
     initial: u32,
-    max: ?u32 = null,
 };
 
 pub const Mutable = enum {
-    mutable,
+    mut,
     immutable,
 };
 
-pub const Import = struct {
-    path: [2][]const u8,
-    kind: union(enum) {
-        func: struct {
-            name: []const u8,
-            params: []const Type = &.{},
-            results: []const Type = &.{},
-        },
-        global: struct {
-            name: []const u8,
-            type: Type,
-            mut: Mutable = .immutable,
-        },
-        memory: Memory,
+const ImportKind = union(enum) {
+    func: struct {
+        name: []const u8,
+        params: []const Type = &.{},
+        results: []const Type = &.{},
     },
+    global: std.meta.Tuple(&.{ []const u8, Mutable, Type }),
+    memory: Memory,
 };
+
+pub const Import = std.meta.Tuple(&.{ [2][]const u8, ImportKind });
 
 const Value = union(enum) {
     i32: i32,
 };
 
-pub const Global = struct {
-    name: []const u8,
-    value: Value,
-    mut: Mutable = .immutable,
-};
+pub const Global = std.meta.Tuple(&.{ []const u8, Mutable, Value });
 
 pub const Data = struct {
     offset: u32,
@@ -66,10 +58,7 @@ pub const FuncType = struct {
     results: []const Type = &.{},
 };
 
-pub const Param = struct {
-    name: []const u8,
-    type: Type,
-};
+pub const Param = std.meta.Tuple(&.{ []const u8, Type });
 
 pub const Op = union(enum) {
     call: []const u8,
@@ -117,15 +106,14 @@ pub const Func = struct {
     ops: []const Op = &.{},
 };
 
-pub const Export = struct {
-    name: []const u8,
-    kind: union(enum) {
-        func: []const u8,
-        global: []const u8,
-        memory: []const u8,
-        table: []const u8,
-    },
+const ExportKind = union(enum) {
+    func: []const u8,
+    global: []const u8,
+    memory: []const u8,
+    table: []const u8,
 };
+
+pub const Export = std.meta.Tuple(&.{ []const u8, ExportKind });
 
 pub const TopLevel = union(enum) {
     import: Import,
