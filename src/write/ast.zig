@@ -8,6 +8,7 @@ const Call = types.ast.Call;
 const Define = types.ast.Define;
 const Lambda = types.ast.Lambda;
 const Expression = types.ast.Expression;
+const Annotate = types.ast.Annotate;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -30,6 +31,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .add => ".add",
         .mul => ".mul",
         .pow => ".pow",
+        .arrow => ".arrow",
     };
 }
 
@@ -110,6 +112,21 @@ fn lambda(writer: anytype, l: Lambda, i: Indent) !void {
     try writer.writeAll("},");
 }
 
+fn annotate(writer: anytype, a: Annotate, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".annotate = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".name = &.{");
+    try expression(writer, a.name.*, i + 3, false);
+    try indent(writer, i + 3);
+    try writer.writeAll(".type = &.{");
+    try expression(writer, a.type.*, i + 3, false);
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
 fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{OutOfMemory}!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
@@ -124,6 +141,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{Ou
         .call => |c| try call(writer, c, i),
         .define => |d| try define(writer, d, i),
         .lambda => |l| try lambda(writer, l, i),
+        .annotate => |a| try annotate(writer, a, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");

@@ -294,131 +294,80 @@ test "multi line function definition" {
     try expectEqual(expected, ast);
 }
 
-// test "function definition with parameters" {
-//     const allocator = std.testing.allocator;
-//     const source =
-//         \\add = (x, y) {
-//         \\    x + y
-//         \\}
-//     ;
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .assign,
-//                     .left = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-//                         .kind = .{ .symbol = "add" },
-//                     },
-//                     .right = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
-//                         .kind = .{
-//                             .func = .{
-//                                 .params = &.{ .{ .name = "x" }, .{ .name = "y" } },
-//                                 .body = &.{
-//                                     .{
-//                                         .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
-//                                         .kind = .{
-//                                             .binary_op = .{
-//                                                 .kind = .add,
-//                                                 .left = &.{
-//                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
-//                                                     .kind = .{ .symbol = "x" },
-//                                                 },
-//                                                 .right = &.{
-//                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
-//                                                     .kind = .{ .symbol = "y" },
-//                                                 },
-//                                             },
-//                                         },
-//                                     },
-//                                 },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
-// test "typed function definition" {
-//     const allocator = std.testing.allocator;
-//     const source =
-//         \\add = (x: i32, y: i32) -> i32 {
-//         \\    x + y
-//         \\}
-//     ;
-//     var tokens = tokenize(source);
-//     const ast = try parse(&tokens, allocator);
-//     defer ast.deinit();
-//     const expected: []const Expression = &.{
-//         .{
-//             .span = .{ .begin = .{ .line = 0, .col = 4 }, .end = .{ .line = 0, .col = 5 } },
-//             .kind = .{
-//                 .binary_op = .{
-//                     .kind = .assign,
-//                     .left = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 0 }, .end = .{ .line = 0, .col = 3 } },
-//                         .kind = .{ .symbol = "add" },
-//                     },
-//                     .right = &.{
-//                         .span = .{ .begin = .{ .line = 0, .col = 6 }, .end = .{ .line = 2, .col = 1 } },
-//                         .kind = .{
-//                             .func = .{
-//                                 .params = &.{
-//                                     .{
-//                                         .name = "x",
-//                                         .type = .{
-//                                             .span = .{ .begin = .{ .line = 0, .col = 10 }, .end = .{ .line = 0, .col = 13 } },
-//                                             .kind = .{ .symbol = "i32" },
-//                                         },
-//                                     },
-//                                     .{
-//                                         .name = "y",
-//                                         .type = .{
-//                                             .span = .{ .begin = .{ .line = 0, .col = 18 }, .end = .{ .line = 0, .col = 21 } },
-//                                             .kind = .{ .symbol = "i32" },
-//                                         },
-//                                     },
-//                                 },
-//                                 .return_type = &.{
-//                                     .span = .{ .begin = .{ .line = 0, .col = 26 }, .end = .{ .line = 0, .col = 29 } },
-//                                     .kind = .{ .symbol = "i32" },
-//                                 },
-//                                 .body = &.{
-//                                     .{
-//                                         .span = .{ .begin = .{ .line = 1, .col = 6 }, .end = .{ .line = 1, .col = 7 } },
-//                                         .kind = .{
-//                                             .binary_op = .{
-//                                                 .kind = .add,
-//                                                 .left = &.{
-//                                                     .span = .{ .begin = .{ .line = 1, .col = 4 }, .end = .{ .line = 1, .col = 5 } },
-//                                                     .kind = .{ .symbol = "x" },
-//                                                 },
-//                                                 .right = &.{
-//                                                     .span = .{ .begin = .{ .line = 1, .col = 8 }, .end = .{ .line = 1, .col = 9 } },
-//                                                     .kind = .{ .symbol = "y" },
-//                                                 },
-//                                             },
-//                                         },
-//                                     },
-//                                 },
-//                             },
-//                         },
-//                     },
-//                 },
-//             },
-//         },
-//     };
-//     try expectEqualExpressions(expected, ast.expressions);
-// }
-//
+test "typed function definition" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\add : I32 -> I32 -> I32
+        \\add = \x y -> x + y
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 4 }, .{ 0, 5 } },
+            .kind = .{
+                .annotate = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 3 } }, .kind = .{ .symbol = "add" } },
+                    .type = &.{
+                        .span = .{ .{ 0, 10 }, .{ 0, 12 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .arrow,
+                                .left = &.{ .span = .{ .{ 0, 6 }, .{ 0, 9 } }, .kind = .{ .symbol = "I32" } },
+                                .right = &.{
+                                    .span = .{ .{ 0, 17 }, .{ 0, 19 } },
+                                    .kind = .{
+                                        .binary_op = .{
+                                            .kind = .arrow,
+                                            .left = &.{ .span = .{ .{ 0, 13 }, .{ 0, 16 } }, .kind = .{ .symbol = "I32" } },
+                                            .right = &.{ .span = .{ .{ 0, 20 }, .{ 0, 23 } }, .kind = .{ .symbol = "I32" } },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{
+            .span = .{ .{ 1, 4 }, .{ 1, 5 } },
+            .kind = .{
+                .define = .{
+                    .name = &.{ .span = .{ .{ 1, 0 }, .{ 1, 3 } }, .kind = .{ .symbol = "add" } },
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 1, 6 }, .{ 1, 17 } },
+                            .kind = .{
+                                .lambda = .{
+                                    .params = &.{
+                                        .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .{ .symbol = "x" } },
+                                        .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .{ .symbol = "y" } },
+                                    },
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 1, 16 }, .{ 1, 17 } },
+                                            .kind = .{
+                                                .binary_op = .{
+                                                    .kind = .add,
+                                                    .left = &.{ .span = .{ .{ 1, 14 }, .{ 1, 15 } }, .kind = .{ .symbol = "x" } },
+                                                    .right = &.{ .span = .{ .{ 1, 18 }, .{ 1, 19 } }, .kind = .{ .symbol = "y" } },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, ast);
+}
+
 // test "typed variable declaration" {
 //     const allocator = std.testing.allocator;
 //     const source =

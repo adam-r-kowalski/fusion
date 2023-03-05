@@ -24,8 +24,13 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
         .precedence = LOWEST,
         .indent = 0,
     };
-    const expr = try expression(context);
-    try expressions.append(expr);
+    while (peekToken(tokens)) |token| {
+        if (token.kind == .indent) {
+            _ = nextToken(tokens);
+        }
+        const expr = try expression(context);
+        try expressions.append(expr);
+    }
     return .{ .arena = arena, .expressions = expressions.toOwnedSlice() };
 }
 
@@ -139,18 +144,23 @@ fn lambda(context: Context, backslash: Token) !Expression {
     };
 }
 
+const DELTA = 10;
+
 const LOWEST = 0;
 const DEFINE = LOWEST;
-const ADD = DEFINE + 1;
-const MUL = ADD + 1;
-const POW = MUL + 1;
-const CALL = MUL + 1;
-const HIGHEST = CALL + 1;
+const ANNOTATE = DEFINE;
+const ARROW = ANNOTATE + DELTA;
+const ADD = ARROW + DELTA;
+const MUL = ADD + DELTA;
+const POW = MUL + DELTA;
+const CALL = MUL + DELTA;
+const HIGHEST = CALL + DELTA;
 
 const Infix = union(enum) {
     binary_op: BinaryOpKind,
     call,
     define,
+    annotate,
 };
 
 fn precedence(parser: Infix) u8 {
@@ -160,10 +170,12 @@ fn precedence(parser: Infix) u8 {
                 .add => return ADD,
                 .mul => return MUL,
                 .pow => return POW,
+                .arrow => return ARROW,
             }
         },
         .define => return DEFINE,
         .call => return CALL,
+        .annotate => return ANNOTATE,
     }
 }
 
@@ -173,7 +185,10 @@ fn infix(context: Context, left: Expression) ?Infix {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
             .caret => return .{ .binary_op = .pow },
+            .right_arrow => return .{ .binary_op = .arrow },
             .equal => return .define,
+            .colon => return .annotate,
+            .indent => return null,
             else => {
                 if (left.kind == .symbol) return .call;
                 return null;
@@ -234,10 +249,28 @@ fn define(context: Context, lhs: Expression) !Expression {
     };
 }
 
+fn annotate(context: Context, lhs: Expression) !Expression {
+    const colon = expect(context.tokens, .colon);
+    const name = try context.allocator.create(Expression);
+    name.* = lhs;
+    var type_ = try context.allocator.create(Expression);
+    type_.* = try expression(withPrecedence(context, LOWEST));
+    return .{
+        .span = colon.span,
+        .kind = .{
+            .annotate = .{
+                .name = name,
+                .type = type_,
+            },
+        },
+    };
+}
+
 fn run(parser: Infix, context: Context, left: Expression) !Expression {
     switch (parser) {
         .binary_op => |value| return binaryOp(context, left, value),
         .call => return call(context, left),
         .define => return define(context, left),
+        .annotate => return annotate(context, left),
     }
 }
