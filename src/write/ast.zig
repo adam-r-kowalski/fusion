@@ -29,6 +29,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
     return switch (kind) {
         .add => ".add",
         .mul => ".mul",
+        .pow => ".pow",
     };
 }
 
@@ -75,7 +76,6 @@ fn define(writer: anytype, d: Define, i: Indent) !void {
     try writer.writeAll(".name = &.{");
     try expression(writer, d.name.*, i + 3, false);
     try indent(writer, i + 3);
-    try writer.writeAll("},");
     try writer.writeAll(".body = &.{");
     for (d.body) |expr| {
         try expression(writer, expr, i + 4, true);

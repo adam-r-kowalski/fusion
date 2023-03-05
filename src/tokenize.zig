@@ -121,20 +121,17 @@ fn choice(tokens: *Tokens, kind: Kind, choices: []const Choice) Token {
 }
 
 fn newLine(tokens: *Tokens) Token {
-    const begin = tokens.pos;
-    tokens.pos[0] += 1;
     tokens.pos[1] = 0;
-    tokens.source = tokens.source[1..];
-    tokens.expecting_indent = true;
-    return .{ .kind = .new_line, .span = .{ begin, tokens.pos } };
-}
-
-fn indent(tokens: *Tokens) Token {
-    const begin = tokens.pos;
     var i: usize = 0;
-    while (i < tokens.source.len and tokens.source[i] == ' ') : (i += 1) {}
-    advance(tokens, i);
-    return .{ .kind = .indent, .span = .{ begin, tokens.pos } };
+    while (tokens.source[i] == '\n') : (i += 1) {
+        tokens.pos[0] += 1;
+    }
+    const begin = tokens.pos;
+    while (tokens.source[i] == ' ') : (i += 1) {
+        tokens.pos[1] += 1;
+    }
+    tokens.source = tokens.source[i..];
+    return .{ .kind = .{ .indent = tokens.pos[1] }, .span = .{ begin, tokens.pos } };
 }
 
 pub fn nextToken(tokens: *Tokens) ?Token {
@@ -150,8 +147,7 @@ pub fn peekToken(tokens: *Tokens) ?Token {
 }
 
 fn getToken(tokens: *Tokens) ?Token {
-    if (!tokens.expecting_indent) trim(tokens);
-    tokens.expecting_indent = false;
+    trim(tokens);
     if (tokens.source.len == 0) return null;
     switch (tokens.source[0]) {
         '0'...'9', '-', '.' => return number(tokens),
@@ -172,7 +168,6 @@ fn getToken(tokens: *Tokens) ?Token {
         '^' => return exact(tokens, .caret),
         ',' => return exact(tokens, .comma),
         ':' => return exact(tokens, .colon),
-        ' ' => return indent(tokens),
         '\n' => return newLine(tokens),
         else => return symbol(tokens),
     }

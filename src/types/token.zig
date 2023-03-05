@@ -31,8 +31,7 @@ pub const Kind = union(enum) {
     left_arrow,
     right_arrow,
     fat_arrow,
-    indent,
-    new_line,
+    indent: usize,
 };
 
 /// row, col
@@ -50,5 +49,4 @@ pub const Tokens = struct {
     source: []const u8,
     pos: Position = .{ 0, 0 },
     peeked: ?Token = null,
-    expecting_indent: bool = true,
 };

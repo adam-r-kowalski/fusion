@@ -6,6 +6,7 @@ pub const Span = @import("token.zig").Span;
 pub const BinaryOpKind = enum {
     add,
     mul,
+    pow,
 };
 
 pub const BinaryOp = struct {

@@ -33,7 +33,7 @@ const Context = struct {
     allocator: Allocator,
     tokens: *Tokens,
     precedence: u8,
-    indent: u8,
+    indent: usize,
 };
 
 fn withPrecedence(context: Context, p: u8) Context {
@@ -42,6 +42,15 @@ fn withPrecedence(context: Context, p: u8) Context {
         .tokens = context.tokens,
         .precedence = p,
         .indent = context.indent,
+    };
+}
+
+fn withIndent(context: Context, i: usize) Context {
+    return .{
+        .allocator = context.allocator,
+        .tokens = context.tokens,
+        .precedence = context.precedence,
+        .indent = i,
     };
 }
 
@@ -80,8 +89,33 @@ fn expect(tokens: *Tokens, kind: TokenKind) Token {
     return token;
 }
 
-fn last(exprs: std.ArrayList(Expression)) Expression {
-    return exprs.items[exprs.items.len - 1];
+fn last(exprs: []const Expression) Expression {
+    return exprs[exprs.len - 1];
+}
+
+fn block(context: Context) ![]Expression {
+    var body = std.ArrayList(Expression).init(context.allocator);
+    if (peekToken(context.tokens)) |token| {
+        if (token.kind != .indent) {
+            const expr = try expression(context);
+            try body.append(expr);
+        } else {
+            _ = nextToken(context.tokens);
+            const indent = token.kind.indent;
+            std.debug.assert(indent > context.indent);
+            const indented = withIndent(context, indent);
+            while (true) {
+                const expr = try expression(indented);
+                try body.append(expr);
+                if (peekToken(indented.tokens)) |t| {
+                    if (t.kind != .indent) break;
+                    if (t.kind.indent != indent) break;
+                    _ = nextToken(indented.tokens);
+                } else break;
+            }
+        }
+    }
+    return body.toOwnedSlice();
 }
 
 fn lambda(context: Context, backslash: Token) !Expression {
@@ -93,15 +127,13 @@ fn lambda(context: Context, backslash: Token) !Expression {
         try params.append(param);
     }
     _ = expect(context.tokens, .right_arrow);
-    var body = std.ArrayList(Expression).init(context.allocator);
-    const expr = try expression(withPrecedence(context, LOWEST));
-    try body.append(expr);
+    const body = try block(context);
     return .{
         .span = .{ backslash.span[0], last(body).span[1] },
         .kind = .{
             .lambda = .{
                 .params = params.toOwnedSlice(),
-                .body = body.toOwnedSlice(),
+                .body = body,
             },
         },
     };
@@ -111,6 +143,7 @@ const LOWEST = 0;
 const DEFINE = LOWEST;
 const ADD = DEFINE + 1;
 const MUL = ADD + 1;
+const POW = MUL + 1;
 const CALL = MUL + 1;
 const HIGHEST = CALL + 1;
 
@@ -126,6 +159,7 @@ fn precedence(parser: Infix) u8 {
             switch (op) {
                 .add => return ADD,
                 .mul => return MUL,
+                .pow => return POW,
             }
         },
         .define => return DEFINE,
@@ -138,6 +172,7 @@ fn infix(context: Context, left: Expression) ?Infix {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
+            .caret => return .{ .binary_op = .pow },
             .equal => return .define,
             else => {
                 if (left.kind == .symbol) return .call;
@@ -161,19 +196,23 @@ fn binaryOp(context: Context, lhs: Expression, kind: BinaryOpKind) !Expression {
     };
 }
 
+fn arguments(context: Context) ![]Expression {
+    var args = std.ArrayList(Expression).init(context.allocator);
+    while (peekToken(context.tokens)) |token| {
+        if (token.kind == .indent) break;
+        const arg = try expression(context);
+        try args.append(arg);
+    }
+    return args.toOwnedSlice();
+}
+
 fn call(context: Context, lhs: Expression) !Expression {
     const func = try context.allocator.create(Expression);
     func.* = lhs;
-    var args = std.ArrayList(Expression).init(context.allocator);
-    const lowest = withPrecedence(context, LOWEST);
-    while (peekToken(lowest.tokens)) |token| {
-        if (token.kind == .new_line) break;
-        const arg = try expression(lowest);
-        try args.append(arg);
-    }
+    const args = try arguments(withPrecedence(context, LOWEST));
     return .{
         .span = .{ lhs.span[0], last(args).span[1] },
-        .kind = .{ .call = .{ .func = func, .args = args.toOwnedSlice() } },
+        .kind = .{ .call = .{ .func = func, .args = args } },
     };
 }
 

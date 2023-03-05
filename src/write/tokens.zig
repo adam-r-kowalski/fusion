@@ -46,8 +46,7 @@ pub fn token(writer: anytype, t: Token) !void {
         .left_arrow => try writer.writeAll(".left_arrow"),
         .right_arrow => try writer.writeAll(".right_arrow"),
         .fat_arrow => try writer.writeAll(".fat_arrow"),
-        .indent => try writer.writeAll(".indent"),
-        .new_line => try writer.writeAll(".new_line"),
+        .indent => |indent| try std.fmt.format(writer, ".{{ .indent = {} }}", .{indent}),
     }
     try writer.writeAll(" },");
 }
