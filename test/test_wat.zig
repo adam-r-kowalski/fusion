@@ -921,66 +921,64 @@ test "tables" {
     try std.testing.expectEqualStrings(expected, actual);
 }
 
-// test "export table" {
-//     const allocator = std.testing.allocator;
-//     const module = &.{
-//         .{ .table = .{ .name = "table", .initial = 2 } },
-//         .{
-//             .func = .{
-//                 .name = "f",
-//                 .params = &.{},
-//                 .results = &.{.i32},
-//                 .ops = &.{.{ .i32_const = 42 }},
-//             },
-//         },
-//         .{
-//             .func = .{
-//                 .name = "g",
-//                 .params = &.{},
-//                 .results = &.{.i32},
-//                 .ops = &.{.{ .i32_const = 13 }},
-//             },
-//         },
-//         .{ .elem = .{ .offset = 0, .name = "f" } },
-//         .{ .elem = .{ .offset = 1, .name = "g" } },
-//         .{ .functype = .{ .name = "return_i32", .params = &.{}, .results = &.{.i32} } },
-//         .{
-//             .func = .{
-//                 .name = "callByIndex",
-//                 .params = &.{.{ .name = "i", .type = .i32 }},
-//                 .results = &.{.i32},
-//                 .ops = &.{
-//                     .{ .local_get = "i" },
-//                     .{ .call_indirect = "return_i32" },
-//                 },
-//             },
-//         },
-//         .{ .export_ = .{ .name = "table", .kind = .{ .table = "table" } } },
-//     };
-//     var actual = try watAlloc(module, allocator);
-//     defer allocator.free(actual);
-//     const expected =
-//         \\(module
-//         \\
-//         \\    (table $table 2 funcref)
-//         \\
-//         \\    (func $f (result i32)
-//         \\        (i32.const 42))
-//         \\
-//         \\    (func $g (result i32)
-//         \\        (i32.const 13))
-//         \\
-//         \\    (elem (i32.const 0) $f)
-//         \\
-//         \\    (elem (i32.const 1) $g)
-//         \\
-//         \\    (type $return_i32 (func (result i32)))
-//         \\
-//         \\    (func $callByIndex (param $i i32) (result i32)
-//         \\        (local.get $i)
-//         \\        (call_indirect (type $return_i32)))
-//         \\
-//         \\    (export "table" (table $table)))
-//     ;
-//     try std.testing.expectEqualStrings(expected, actual);
-// }
+test "export table" {
+    const allocator = std.testing.allocator;
+    const module = &.{
+        .{ .table = .{ "table", 2 } },
+        .{
+            .func = .{
+                .name = "f",
+                .results = &.{.i32},
+                .ops = &.{.{ .i32_const = 42 }},
+            },
+        },
+        .{
+            .func = .{
+                .name = "g",
+                .results = &.{.i32},
+                .ops = &.{.{ .i32_const = 13 }},
+            },
+        },
+        .{ .elem = .{ 0, "f" } },
+        .{ .elem = .{ 1, "g" } },
+        .{ .functype = .{ .name = "return_i32", .results = &.{.i32} } },
+        .{
+            .func = .{
+                .name = "callByIndex",
+                .params = &.{.{ "i", .i32 }},
+                .results = &.{.i32},
+                .ops = &.{
+                    .{ .local_get = "i" },
+                    .{ .call_indirect = "return_i32" },
+                },
+            },
+        },
+        .{ .export_ = .{ "table", .{ .table = "table" } } },
+    };
+    var actual = try watAlloc(module, allocator);
+    defer allocator.free(actual);
+    const expected =
+        \\(module
+        \\
+        \\    (table $table 2 funcref)
+        \\
+        \\    (func $f (result i32)
+        \\        (i32.const 42))
+        \\
+        \\    (func $g (result i32)
+        \\        (i32.const 13))
+        \\
+        \\    (elem (i32.const 0) $f)
+        \\
+        \\    (elem (i32.const 1) $g)
+        \\
+        \\    (type $return_i32 (func (result i32)))
+        \\
+        \\    (func $callByIndex (param $i i32) (result i32)
+        \\        (local.get $i)
+        \\        (call_indirect (type $return_i32)))
+        \\
+        \\    (export "table" (table $table)))
+    ;
+    try std.testing.expectEqualStrings(expected, actual);
+}
