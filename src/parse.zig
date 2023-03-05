@@ -18,21 +18,41 @@ const peekToken = tokenize.peekToken;
 pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
     var arena = Arena.init(allocator);
     var expressions = std.ArrayList(Expression).init(arena.allocator());
-    const expr = try expression(arena.allocator(), tokens, 0);
+    const context = .{
+        .allocator = arena.allocator(),
+        .tokens = tokens,
+        .precedence = LOWEST,
+        .indent = 0,
+    };
+    const expr = try expression(context);
     try expressions.append(expr);
     return .{ .arena = arena, .expressions = expressions.toOwnedSlice() };
 }
 
-const Precedence = u8;
+const Context = struct {
+    allocator: Allocator,
+    tokens: *Tokens,
+    precedence: u8,
+    indent: u8,
+};
 
-fn expression(allocator: Allocator, tokens: *Tokens, p: Precedence) error{OutOfMemory}!Expression {
-    const token = nextToken(tokens).?;
-    var left = try prefix(allocator, tokens, token);
+fn withPrecedence(context: Context, p: u8) Context {
+    return .{
+        .allocator = context.allocator,
+        .tokens = context.tokens,
+        .precedence = p,
+        .indent = context.indent,
+    };
+}
+
+fn expression(context: Context) error{OutOfMemory}!Expression {
+    const token = nextToken(context.tokens).?;
+    var left = try prefix(context, token);
     while (true) {
-        if (infix(tokens, left)) |parser| {
+        if (infix(context, left)) |parser| {
             const next = precedence(parser);
-            if (p <= next) {
-                left = try run(parser, allocator, tokens, left, next);
+            if (context.precedence <= next) {
+                left = try run(parser, withPrecedence(context, next), left);
             } else {
                 return left;
             }
@@ -42,11 +62,11 @@ fn expression(allocator: Allocator, tokens: *Tokens, p: Precedence) error{OutOfM
     }
 }
 
-fn prefix(allocator: Allocator, tokens: *Tokens, token: Token) !Expression {
+fn prefix(context: Context, token: Token) !Expression {
     switch (token.kind) {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
-        .backslash => return lambda(allocator, tokens, token),
+        .backslash => return lambda(context, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -64,16 +84,17 @@ fn last(exprs: std.ArrayList(Expression)) Expression {
     return exprs.items[exprs.items.len - 1];
 }
 
-fn lambda(allocator: Allocator, tokens: *Tokens, backslash: Token) !Expression {
-    var params = std.ArrayList(Expression).init(allocator);
-    while (peekToken(tokens)) |token| {
+fn lambda(context: Context, backslash: Token) !Expression {
+    var params = std.ArrayList(Expression).init(context.allocator);
+    const highest = withPrecedence(context, HIGHEST);
+    while (peekToken(highest.tokens)) |token| {
         if (token.kind == .right_arrow) break;
-        const param = try expression(allocator, tokens, HIGHEST);
+        const param = try expression(highest);
         try params.append(param);
     }
-    _ = expect(tokens, .right_arrow);
-    var body = std.ArrayList(Expression).init(allocator);
-    const expr = try expression(allocator, tokens, LOWEST);
+    _ = expect(context.tokens, .right_arrow);
+    var body = std.ArrayList(Expression).init(context.allocator);
+    const expr = try expression(withPrecedence(context, LOWEST));
     try body.append(expr);
     return .{
         .span = .{ backslash.span[0], last(body).span[1] },
@@ -99,7 +120,7 @@ const Infix = union(enum) {
     define,
 };
 
-fn precedence(parser: Infix) Precedence {
+fn precedence(parser: Infix) u8 {
     switch (parser) {
         .binary_op => |op| {
             switch (op) {
@@ -112,8 +133,8 @@ fn precedence(parser: Infix) Precedence {
     }
 }
 
-fn infix(tokens: *Tokens, left: Expression) ?Infix {
-    if (peekToken(tokens)) |token| {
+fn infix(context: Context, left: Expression) ?Infix {
+    if (peekToken(context.tokens)) |token| {
         switch (token.kind) {
             .plus => return .{ .binary_op = .add },
             .star => return .{ .binary_op = .mul },
@@ -128,25 +149,26 @@ fn infix(tokens: *Tokens, left: Expression) ?Infix {
     }
 }
 
-fn binaryOp(allocator: Allocator, tokens: *Tokens, lhs: Expression, kind: BinaryOpKind, p: Precedence) !Expression {
-    const op = nextToken(tokens).?;
-    const left = try allocator.create(Expression);
+fn binaryOp(context: Context, lhs: Expression, kind: BinaryOpKind) !Expression {
+    const op = nextToken(context.tokens).?;
+    const left = try context.allocator.create(Expression);
     left.* = lhs;
-    const right = try allocator.create(Expression);
-    right.* = try expression(allocator, tokens, p);
+    const right = try context.allocator.create(Expression);
+    right.* = try expression(context);
     return .{
         .span = op.span,
         .kind = .{ .binary_op = .{ .kind = kind, .left = left, .right = right } },
     };
 }
 
-fn call(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
-    const func = try allocator.create(Expression);
+fn call(context: Context, lhs: Expression) !Expression {
+    const func = try context.allocator.create(Expression);
     func.* = lhs;
-    var args = std.ArrayList(Expression).init(allocator);
-    while (peekToken(tokens)) |token| {
+    var args = std.ArrayList(Expression).init(context.allocator);
+    const lowest = withPrecedence(context, LOWEST);
+    while (peekToken(lowest.tokens)) |token| {
         if (token.kind == .new_line) break;
-        const arg = try expression(allocator, tokens, LOWEST);
+        const arg = try expression(lowest);
         try args.append(arg);
     }
     return .{
@@ -155,12 +177,12 @@ fn call(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
     };
 }
 
-fn define(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
-    const equal = expect(tokens, .equal);
-    const name = try allocator.create(Expression);
+fn define(context: Context, lhs: Expression) !Expression {
+    const equal = expect(context.tokens, .equal);
+    const name = try context.allocator.create(Expression);
     name.* = lhs;
-    var body = std.ArrayList(Expression).init(allocator);
-    const expr = try expression(allocator, tokens, LOWEST);
+    var body = std.ArrayList(Expression).init(context.allocator);
+    const expr = try expression(withPrecedence(context, LOWEST));
     try body.append(expr);
     return .{
         .span = equal.span,
@@ -173,16 +195,10 @@ fn define(allocator: Allocator, tokens: *Tokens, lhs: Expression) !Expression {
     };
 }
 
-fn run(
-    parser: Infix,
-    allocator: Allocator,
-    tokens: *Tokens,
-    left: Expression,
-    p: Precedence,
-) !Expression {
+fn run(parser: Infix, context: Context, left: Expression) !Expression {
     switch (parser) {
-        .binary_op => |value| return binaryOp(allocator, tokens, left, value, p),
-        .call => return call(allocator, tokens, left),
-        .define => return define(allocator, tokens, left),
+        .binary_op => |value| return binaryOp(context, left, value),
+        .call => return call(context, left),
+        .define => return define(context, left),
     }
 }
