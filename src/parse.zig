@@ -235,15 +235,13 @@ fn define(context: Context, lhs: Expression) !Expression {
     const equal = expect(context.tokens, .equal);
     const name = try context.allocator.create(Expression);
     name.* = lhs;
-    var body = std.ArrayList(Expression).init(context.allocator);
-    const expr = try expression(withPrecedence(context, LOWEST));
-    try body.append(expr);
+    const body = try block(context);
     return .{
         .span = equal.span,
         .kind = .{
             .define = .{
                 .name = name,
-                .body = body.toOwnedSlice(),
+                .body = body,
             },
         },
     };
