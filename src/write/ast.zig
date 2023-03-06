@@ -9,6 +9,7 @@ const Define = types.ast.Define;
 const Lambda = types.ast.Lambda;
 const Expression = types.ast.Expression;
 const Annotate = types.ast.Annotate;
+const Group = types.ast.Group;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -127,6 +128,18 @@ fn annotate(writer: anytype, a: Annotate, i: Indent) !void {
     try writer.writeAll("},");
 }
 
+fn group(writer: anytype, g: Group, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".group = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".expr = &.{");
+    try expression(writer, g.expr.*, i + 3, false);
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
 fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{OutOfMemory}!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
@@ -142,6 +155,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{Ou
         .define => |d| try define(writer, d, i),
         .lambda => |l| try lambda(writer, l, i),
         .annotate => |a| try annotate(writer, a, i),
+        .group => |g| try group(writer, g, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");

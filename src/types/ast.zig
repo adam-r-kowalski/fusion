@@ -36,6 +36,10 @@ pub const Annotate = struct {
     type: *const Expression,
 };
 
+pub const Group = struct {
+    expr: *const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
@@ -44,6 +48,7 @@ pub const Kind = union(enum) {
     define: Define,
     lambda: Lambda,
     annotate: Annotate,
+    group: Group,
 };
 
 pub const Expression = struct {

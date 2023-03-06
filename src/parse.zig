@@ -64,8 +64,11 @@ fn expression(context: Context) error{OutOfMemory}!Expression {
     var left = try prefix(context, token);
     while (true) {
         if (infix(context, left)) |parser| {
-            const next = precedence(parser);
+            var next = precedence(parser);
             if (context.precedence <= next) {
+                if (associativity(parser) == .left) {
+                    next += 1;
+                }
                 left = try run(parser, withPrecedence(context, next), left);
             } else {
                 return left;
@@ -81,6 +84,7 @@ fn prefix(context: Context, token: Token) !Expression {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
         .backslash => return lambda(context, token),
+        .left_paren => return group(context, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -144,6 +148,16 @@ fn lambda(context: Context, backslash: Token) !Expression {
     };
 }
 
+fn group(context: Context, left_paren: Token) !Expression {
+    const expr = try context.allocator.create(Expression);
+    expr.* = try expression(withPrecedence(context, LOWEST));
+    _ = expect(context.tokens, .right_paren);
+    return .{
+        .span = .{ left_paren.span[0], expr.span[1] },
+        .kind = .{ .group = .{ .expr = expr } },
+    };
+}
+
 const DELTA = 10;
 
 const LOWEST = 0;
@@ -179,6 +193,21 @@ fn precedence(parser: Infix) u8 {
     }
 }
 
+const Associativity = enum { left, right };
+
+fn associativity(parser: Infix) Associativity {
+    switch (parser) {
+        .binary_op => |op| {
+            switch (op) {
+                .pow, .arrow => return .right,
+                else => return .left,
+            }
+        },
+        .define => return .right,
+        else => return .left,
+    }
+}
+
 fn infix(context: Context, left: Expression) ?Infix {
     if (peekToken(context.tokens)) |token| {
         switch (token.kind) {
@@ -189,6 +218,7 @@ fn infix(context: Context, left: Expression) ?Infix {
             .equal => return .define,
             .colon => return .annotate,
             .indent => return null,
+            .right_paren => return null,
             else => {
                 if (left.kind == .symbol) return .call;
                 return null;

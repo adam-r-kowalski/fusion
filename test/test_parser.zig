@@ -119,6 +119,140 @@ test "operator precedence higher first" {
     try expectEqual(expected, actual);
 }
 
+test "left associative operator" {
+    const allocator = std.testing.allocator;
+    const source = "x + y + 5";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 6 }, .{ 0, 7 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .add,
+                    .left = &.{
+                        .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .add,
+                                .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                                .right = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                            },
+                        },
+                    },
+                    .right = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "left associative operator with group" {
+    const allocator = std.testing.allocator;
+    const source = "(x + y) + 5";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 8 }, .{ 0, 9 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .add,
+                    .left = &.{
+                        .span = .{ .{ 0, 0 }, .{ 0, 4 } },
+                        .kind = .{
+                            .group = .{
+                                .expr = &.{
+                                    .span = .{ .{ 0, 3 }, .{ 0, 4 } },
+                                    .kind = .{
+                                        .binary_op = .{
+                                            .kind = .add,
+                                            .left = &.{ .span = .{ .{ 0, 1 }, .{ 0, 2 } }, .kind = .{ .symbol = "x" } },
+                                            .right = &.{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .{ .symbol = "y" } },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    .right = &.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .int = "5" } },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "right associative operator" {
+    const allocator = std.testing.allocator;
+    const source = "x ^ y ^ 5";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .pow,
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .right = &.{
+                        .span = .{ .{ 0, 6 }, .{ 0, 7 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .pow,
+                                .left = &.{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .{ .symbol = "y" } },
+                                .right = &.{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .int = "5" } },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "parenthesis for grouping" {
+    const allocator = std.testing.allocator;
+    const source = "x ^ (y ^ 5)";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 2 }, .{ 0, 3 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .pow,
+                    .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "x" } },
+                    .right = &.{
+                        .span = .{ .{ 0, 4 }, .{ 0, 8 } },
+                        .kind = .{
+                            .group = .{
+                                .expr = &.{
+                                    .span = .{ .{ 0, 7 }, .{ 0, 8 } },
+                                    .kind = .{
+                                        .binary_op = .{
+                                            .kind = .pow,
+                                            .left = &.{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .{ .symbol = "y" } },
+                                            .right = &.{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .{ .int = "5" } },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "function call" {
     const allocator = std.testing.allocator;
     const source = "min 10 20";
@@ -142,7 +276,7 @@ test "function call" {
     try expectEqual(expected, actual);
 }
 
-test "define" {
+test "single line define" {
     const allocator = std.testing.allocator;
     const source = "x = 5";
     var tokens = tokenize(source);
