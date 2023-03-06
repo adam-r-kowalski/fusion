@@ -8,6 +8,7 @@ pub const BinaryOpKind = enum {
     mul,
     pow,
     arrow,
+    dot,
 };
 
 pub const BinaryOp = struct {
@@ -40,6 +41,11 @@ pub const Group = struct {
     expr: *const Expression,
 };
 
+pub const For = struct {
+    indices: []const Expression,
+    body: []const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
@@ -49,6 +55,7 @@ pub const Kind = union(enum) {
     lambda: Lambda,
     annotate: Annotate,
     group: Group,
+    for_: For,
 };
 
 pub const Expression = struct {

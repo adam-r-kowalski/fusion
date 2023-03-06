@@ -32,6 +32,12 @@ pub const Kind = union(enum) {
     right_arrow,
     fat_arrow,
     indent: usize,
+    if_,
+    then,
+    else_,
+    when,
+    is,
+    for_,
 };
 
 /// row, col

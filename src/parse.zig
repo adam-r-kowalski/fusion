@@ -85,6 +85,7 @@ fn prefix(context: Context, token: Token) !Expression {
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
         .backslash => return lambda(context, token),
         .left_paren => return group(context, token),
+        .for_ => return for_(context, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -158,6 +159,27 @@ fn group(context: Context, left_paren: Token) !Expression {
     };
 }
 
+fn for_(context: Context, lhs: Token) !Expression {
+    var indices = std.ArrayList(Expression).init(context.allocator);
+    const highest = withPrecedence(context, HIGHEST);
+    while (peekToken(highest.tokens)) |token| {
+        if (token.kind == .right_arrow) break;
+        const param = try expression(highest);
+        try indices.append(param);
+    }
+    _ = expect(context.tokens, .right_arrow);
+    const body = try block(context);
+    return .{
+        .span = .{ lhs.span[0], last(body).span[1] },
+        .kind = .{
+            .for_ = .{
+                .indices = indices.toOwnedSlice(),
+                .body = body,
+            },
+        },
+    };
+}
+
 const DELTA = 10;
 
 const LOWEST = 0;
@@ -167,7 +189,8 @@ const ARROW = ANNOTATE + DELTA;
 const ADD = ARROW + DELTA;
 const MUL = ADD + DELTA;
 const POW = MUL + DELTA;
-const CALL = MUL + DELTA;
+const DOT = POW + DELTA;
+const CALL = DOT + DELTA;
 const HIGHEST = CALL + DELTA;
 
 const Infix = union(enum) {
@@ -185,6 +208,7 @@ fn precedence(parser: Infix) u8 {
                 .mul => return MUL,
                 .pow => return POW,
                 .arrow => return ARROW,
+                .dot => return DOT,
             }
         },
         .define => return DEFINE,
@@ -215,6 +239,7 @@ fn infix(context: Context, left: Expression) ?Infix {
             .star => return .{ .binary_op = .mul },
             .caret => return .{ .binary_op = .pow },
             .right_arrow => return .{ .binary_op = .arrow },
+            .dot => return .{ .binary_op = .dot },
             .equal => return .define,
             .colon => return .annotate,
             .indent => return null,

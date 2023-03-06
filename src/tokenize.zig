@@ -94,6 +94,12 @@ fn symbol(tokens: *Tokens) Token {
     if (eql(u8, value, "not")) return .{ .span = span, .kind = .not };
     if (eql(u8, value, "and")) return .{ .span = span, .kind = .and_ };
     if (eql(u8, value, "or")) return .{ .span = span, .kind = .or_ };
+    if (eql(u8, value, "if")) return .{ .span = span, .kind = .if_ };
+    if (eql(u8, value, "then")) return .{ .span = span, .kind = .then };
+    if (eql(u8, value, "else")) return .{ .span = span, .kind = .else_ };
+    if (eql(u8, value, "when")) return .{ .span = span, .kind = .when };
+    if (eql(u8, value, "is")) return .{ .span = span, .kind = .is };
+    if (eql(u8, value, "for")) return .{ .span = span, .kind = .for_ };
     return .{ .span = span, .kind = .{ .symbol = value } };
 }
 

@@ -10,6 +10,7 @@ const Lambda = types.ast.Lambda;
 const Expression = types.ast.Expression;
 const Annotate = types.ast.Annotate;
 const Group = types.ast.Group;
+const For = types.ast.For;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -33,6 +34,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .mul => ".mul",
         .pow => ".pow",
         .arrow => ".arrow",
+        .dot => ".dot",
     };
 }
 
@@ -101,6 +103,7 @@ fn lambda(writer: anytype, l: Lambda, i: Indent) !void {
     }
     try indent(writer, i + 3);
     try writer.writeAll("},");
+    try indent(writer, i + 3);
     try writer.writeAll(".body = &.{");
     for (l.body) |expr| {
         try expression(writer, expr, i + 4, true);
@@ -140,6 +143,29 @@ fn group(writer: anytype, g: Group, i: Indent) !void {
     try writer.writeAll("},");
 }
 
+fn for_(writer: anytype, f: For, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".for_ = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".indices = &.{");
+    for (f.indices) |arg| {
+        try expression(writer, arg, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 3);
+    try writer.writeAll(".body = &.{");
+    for (f.body) |expr| {
+        try expression(writer, expr, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
 fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{OutOfMemory}!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
@@ -156,6 +182,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{Ou
         .lambda => |l| try lambda(writer, l, i),
         .annotate => |a| try annotate(writer, a, i),
         .group => |g| try group(writer, g, i),
+        .for_ => |f| try for_(writer, f, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");

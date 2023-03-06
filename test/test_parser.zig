@@ -555,3 +555,79 @@ test "function annotation" {
     };
     try expectEqual(expected, ast);
 }
+
+test "for expression" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\transpose = \x ->
+        \\    for i j ->
+        \\        x.j.i
+    ;
+    var tokens = tokenize(source);
+    const ast = try parse(&tokens, allocator);
+    defer ast.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 10 }, .{ 0, 11 } },
+            .kind = .{
+                .define = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 9 } }, .kind = .{ .symbol = "transpose" } },
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 0, 12 }, .{ 2, 12 } },
+                            .kind = .{
+                                .lambda = .{
+                                    .params = &.{.{ .span = .{ .{ 0, 13 }, .{ 0, 14 } }, .kind = .{ .symbol = "x" } }},
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 1, 4 }, .{ 2, 12 } },
+                                            .kind = .{
+                                                .for_ = .{
+                                                    .indices = &.{
+                                                        .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .symbol = "i" } },
+                                                        .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .{ .symbol = "j" } },
+                                                    },
+                                                    .body = &.{
+                                                        .{
+                                                            .span = .{ .{ 2, 11 }, .{ 2, 12 } },
+                                                            .kind = .{
+                                                                .binary_op = .{
+                                                                    .kind = .dot,
+                                                                    .left = &.{
+                                                                        .span = .{ .{ 2, 9 }, .{ 2, 10 } },
+                                                                        .kind = .{
+                                                                            .binary_op = .{
+                                                                                .kind = .dot,
+                                                                                .left = &.{
+                                                                                    .span = .{ .{ 2, 8 }, .{ 2, 9 } },
+                                                                                    .kind = .{ .symbol = "x" },
+                                                                                },
+                                                                                .right = &.{
+                                                                                    .span = .{ .{ 2, 10 }, .{ 2, 11 } },
+                                                                                    .kind = .{ .symbol = "j" },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                    .right = &.{
+                                                                        .span = .{ .{ 2, 12 }, .{ 2, 13 } },
+                                                                        .kind = .{ .symbol = "i" },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, ast);
+}

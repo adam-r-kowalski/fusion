@@ -47,6 +47,12 @@ pub fn token(writer: anytype, t: Token) !void {
         .right_arrow => try writer.writeAll(".right_arrow"),
         .fat_arrow => try writer.writeAll(".fat_arrow"),
         .indent => |indent| try std.fmt.format(writer, ".{{ .indent = {} }}", .{indent}),
+        .if_ => try writer.writeAll(".if_"),
+        .then => try writer.writeAll(".then"),
+        .else_ => try writer.writeAll(".else_"),
+        .when => try writer.writeAll(".when"),
+        .is => try writer.writeAll(".is"),
+        .for_ => try writer.writeAll(".for_"),
     }
     try writer.writeAll(" },");
 }

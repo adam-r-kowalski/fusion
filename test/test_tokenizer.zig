@@ -288,6 +288,24 @@ test "multiple indentations in one function" {
     try expectEqual(expected, actual);
 }
 
+test "control flow tokens" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\if then else when is for
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 2 } }, .kind = .if_ },
+        .{ .span = .{ .{ 0, 3 }, .{ 0, 7 } }, .kind = .then },
+        .{ .span = .{ .{ 0, 8 }, .{ 0, 12 } }, .kind = .else_ },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 17 } }, .kind = .when },
+        .{ .span = .{ .{ 0, 18 }, .{ 0, 20 } }, .kind = .is },
+        .{ .span = .{ .{ 0, 21 }, .{ 0, 24 } }, .kind = .for_ },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);
