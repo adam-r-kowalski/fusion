@@ -642,31 +642,24 @@ test "if expression" {
     defer actual.deinit();
     const expected: []const Expression = &.{
         .{
-            .span = .{ .{ 0, 7 }, .{ 0, 8 } },
+            .span = .{ .{ 0, 0 }, .{ 0, 37 } },
             .kind = .{
-                .define = .{
-                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
-                    .body = &.{
-                        .{
-                            .span = .{ .{ 0, 9 }, .{ 0, 18 } },
-                            .kind = .{
-                                .lambda = .{
-                                    .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
-                                    .body = &.{
-                                        .{
-                                            .span = .{ .{ 0, 17 }, .{ 0, 18 } },
-                                            .kind = .{
-                                                .binary_op = .{
-                                                    .kind = .mul,
-                                                    .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
-                                                    .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
+                .if_ = .{
+                    .condition = &.{
+                        .span = .{ .{ 0, 5 }, .{ 0, 6 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .greater,
+                                .left = &.{ .span = .{ .{ 0, 3 }, .{ 0, 4 } }, .kind = .{ .symbol = "x" } },
+                                .right = &.{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .{ .symbol = "y" } },
                             },
                         },
+                    },
+                    .then = &.{
+                        .{ .span = .{ .{ 0, 14 }, .{ 0, 22 } }, .kind = .{ .string = "\"bigger\"" } },
+                    },
+                    .else_ = &.{
+                        .{ .span = .{ .{ 0, 28 }, .{ 0, 37 } }, .kind = .{ .string = "\"smaller\"" } },
                     },
                 },
             },

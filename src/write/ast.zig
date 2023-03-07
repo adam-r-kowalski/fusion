@@ -11,6 +11,7 @@ const Expression = types.ast.Expression;
 const Annotate = types.ast.Annotate;
 const Group = types.ast.Group;
 const For = types.ast.For;
+const If = types.ast.If;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -35,6 +36,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .pow => ".pow",
         .arrow => ".arrow",
         .dot => ".dot",
+        .greater => ".greater",
     };
 }
 
@@ -166,6 +168,32 @@ fn for_(writer: anytype, f: For, i: Indent) !void {
     try writer.writeAll("},");
 }
 
+fn if_(writer: anytype, c: If, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".if_ = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".condition = &.{");
+    try expression(writer, c.condition.*, i + 3, false);
+    try indent(writer, i + 3);
+    try writer.writeAll(".then = &.{");
+    for (c.then) |e| {
+        try expression(writer, e, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 3);
+    try writer.writeAll(".else_ = &.{");
+    for (c.else_) |e| {
+        try expression(writer, e, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
 fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{OutOfMemory}!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
@@ -176,6 +204,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{Ou
     switch (e.kind) {
         .symbol => |s| try std.fmt.format(writer, ".symbol = \"{s}\" }},", .{s}),
         .int => |s| try std.fmt.format(writer, ".int = \"{s}\" }},", .{s}),
+        .string => |s| try std.fmt.format(writer, ".string = \"{s}\" }},", .{s}),
         .binary_op => |op| try binaryOp(writer, op, i),
         .call => |c| try call(writer, c, i),
         .define => |d| try define(writer, d, i),
@@ -183,6 +212,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{Ou
         .annotate => |a| try annotate(writer, a, i),
         .group => |g| try group(writer, g, i),
         .for_ => |f| try for_(writer, f, i),
+        .if_ => |c| try if_(writer, c, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");

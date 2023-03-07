@@ -83,9 +83,11 @@ fn prefix(context: Context, token: Token) !Expression {
     switch (token.kind) {
         .symbol => |value| return .{ .span = token.span, .kind = .{ .symbol = value } },
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
+        .string => |value| return .{ .span = token.span, .kind = .{ .string = value } },
         .backslash => return lambda(context, token),
         .left_paren => return group(context, token),
         .for_ => return for_(context, token),
+        .if_ => return if_(context, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -93,8 +95,8 @@ fn prefix(context: Context, token: Token) !Expression {
     }
 }
 
-fn expect(tokens: *Tokens, kind: TokenKind) Token {
-    const token = nextToken(tokens).?;
+fn expect(context: Context, kind: TokenKind) Token {
+    const token = nextToken(context.tokens).?;
     std.debug.assert(std.meta.activeTag(token.kind) == std.meta.activeTag(kind));
     return token;
 }
@@ -136,7 +138,7 @@ fn lambda(context: Context, backslash: Token) !Expression {
         const param = try expression(highest);
         try params.append(param);
     }
-    _ = expect(context.tokens, .right_arrow);
+    _ = expect(context, .right_arrow);
     const body = try block(context);
     return .{
         .span = .{ backslash.span[0], last(body).span[1] },
@@ -152,7 +154,7 @@ fn lambda(context: Context, backslash: Token) !Expression {
 fn group(context: Context, left_paren: Token) !Expression {
     const expr = try context.allocator.create(Expression);
     expr.* = try expression(withPrecedence(context, LOWEST));
-    _ = expect(context.tokens, .right_paren);
+    _ = expect(context, .right_paren);
     return .{
         .span = .{ left_paren.span[0], expr.span[1] },
         .kind = .{ .group = .{ .expr = expr } },
@@ -167,7 +169,7 @@ fn for_(context: Context, lhs: Token) !Expression {
         const param = try expression(highest);
         try indices.append(param);
     }
-    _ = expect(context.tokens, .right_arrow);
+    _ = expect(context, .right_arrow);
     const body = try block(context);
     return .{
         .span = .{ lhs.span[0], last(body).span[1] },
@@ -180,13 +182,33 @@ fn for_(context: Context, lhs: Token) !Expression {
     };
 }
 
+fn if_(context: Context, lhs: Token) !Expression {
+    const condition = try context.allocator.create(Expression);
+    condition.* = try expression(context);
+    _ = expect(context, .then);
+    const then = try block(context);
+    _ = expect(context, .else_);
+    const else_ = try block(context);
+    return .{
+        .span = .{ lhs.span[0], last(else_).span[1] },
+        .kind = .{
+            .if_ = .{
+                .condition = condition,
+                .then = then,
+                .else_ = else_,
+            },
+        },
+    };
+}
+
 const DELTA = 10;
 
 const LOWEST = 0;
 const DEFINE = LOWEST;
 const ANNOTATE = DEFINE;
 const ARROW = ANNOTATE + DELTA;
-const ADD = ARROW + DELTA;
+const COMPARE = ARROW + DELTA;
+const ADD = COMPARE + DELTA;
 const MUL = ADD + DELTA;
 const POW = MUL + DELTA;
 const DOT = POW + DELTA;
@@ -209,6 +231,7 @@ fn precedence(parser: Infix) u8 {
                 .pow => return POW,
                 .arrow => return ARROW,
                 .dot => return DOT,
+                .greater => return COMPARE,
             }
         },
         .define => return DEFINE,
@@ -240,10 +263,10 @@ fn infix(context: Context, left: Expression) ?Infix {
             .caret => return .{ .binary_op = .pow },
             .right_arrow => return .{ .binary_op = .arrow },
             .dot => return .{ .binary_op = .dot },
+            .greater => return .{ .binary_op = .greater },
             .equal => return .define,
             .colon => return .annotate,
-            .indent => return null,
-            .right_paren => return null,
+            .indent, .right_paren, .then, .else_ => return null,
             else => {
                 if (left.kind == .symbol) return .call;
                 return null;
@@ -287,7 +310,7 @@ fn call(context: Context, lhs: Expression) !Expression {
 }
 
 fn define(context: Context, lhs: Expression) !Expression {
-    const equal = expect(context.tokens, .equal);
+    const equal = expect(context, .equal);
     const name = try context.allocator.create(Expression);
     name.* = lhs;
     const body = try block(context);
@@ -303,7 +326,7 @@ fn define(context: Context, lhs: Expression) !Expression {
 }
 
 fn annotate(context: Context, lhs: Expression) !Expression {
-    const colon = expect(context.tokens, .colon);
+    const colon = expect(context, .colon);
     const name = try context.allocator.create(Expression);
     name.* = lhs;
     var type_ = try context.allocator.create(Expression);

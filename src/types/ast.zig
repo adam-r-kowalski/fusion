@@ -9,6 +9,7 @@ pub const BinaryOpKind = enum {
     pow,
     arrow,
     dot,
+    greater,
 };
 
 pub const BinaryOp = struct {
@@ -46,9 +47,16 @@ pub const For = struct {
     body: []const Expression,
 };
 
+pub const If = struct {
+    condition: *const Expression,
+    then: []const Expression,
+    else_: []const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
+    string: []const u8,
     binary_op: BinaryOp,
     call: Call,
     define: Define,
@@ -56,6 +64,7 @@ pub const Kind = union(enum) {
     annotate: Annotate,
     group: Group,
     for_: For,
+    if_: If,
 };
 
 pub const Expression = struct {
