@@ -17,6 +17,7 @@ pub fn token(writer: anytype, t: Token) !void {
         .symbol => |symbol| try std.fmt.format(writer, ".{{ .symbol = \"{s}\" }}", .{symbol}),
         .int => |int| try std.fmt.format(writer, ".{{ .int = \"{s}\" }}", .{int}),
         .float => |float| try std.fmt.format(writer, ".{{ .float = \"{s}\" }}", .{float}),
+        .string => |string| try std.fmt.format(writer, ".{{ .string = \"{s}\" }}", .{string}),
         .left_bracket => try writer.writeAll(".left_bracket"),
         .right_bracket => try writer.writeAll(".right_bracket"),
         .left_brace => try writer.writeAll(".left_brace"),

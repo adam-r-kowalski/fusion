@@ -631,3 +631,46 @@ test "for expression" {
     };
     try expectEqual(expected, ast);
 }
+
+test "if expression" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\if x > y then "bigger" else "smaller"
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 7 }, .{ 0, 8 } },
+            .kind = .{
+                .define = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 0, 9 }, .{ 0, 18 } },
+                            .kind = .{
+                                .lambda = .{
+                                    .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 0, 17 }, .{ 0, 18 } },
+                                            .kind = .{
+                                                .binary_op = .{
+                                                    .kind = .mul,
+                                                    .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
+                                                    .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

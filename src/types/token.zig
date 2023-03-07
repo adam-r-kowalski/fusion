@@ -2,6 +2,7 @@ pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
     float: []const u8,
+    string: []const u8,
     left_bracket,
     right_bracket,
     left_brace,

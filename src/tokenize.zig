@@ -84,6 +84,24 @@ fn reserved(char: u8) bool {
     };
 }
 
+fn string(tokens: *Tokens) Token {
+    const begin = tokens.pos;
+    var i: usize = 1;
+    while (i < tokens.source.len) : (i += 1) {
+        switch (tokens.source[i]) {
+            '"' => {
+                i += 1;
+                break;
+            },
+            else => continue,
+        }
+    }
+    const value = tokens.source[0..i];
+    advance(tokens, i);
+    const span: Span = .{ begin, tokens.pos };
+    return .{ .span = span, .kind = .{ .string = value } };
+}
+
 fn symbol(tokens: *Tokens) Token {
     const begin = tokens.pos;
     var i: usize = 1;
@@ -175,6 +193,7 @@ fn getToken(tokens: *Tokens) ?Token {
         ',' => return exact(tokens, .comma),
         ':' => return exact(tokens, .colon),
         '\n' => return newLine(tokens),
+        '"' => return string(tokens),
         else => return symbol(tokens),
     }
 }

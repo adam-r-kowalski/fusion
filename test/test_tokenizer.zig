@@ -306,6 +306,23 @@ test "control flow tokens" {
     try expectEqual(expected, actual);
 }
 
+test "string" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\"text" "camelCase" "snake_case" "PascalCase" "😀"
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .string = "\"text\"" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 18 } }, .kind = .{ .string = "\"camelCase\"" } },
+        .{ .span = .{ .{ 0, 19 }, .{ 0, 31 } }, .kind = .{ .string = "\"snake_case\"" } },
+        .{ .span = .{ .{ 0, 32 }, .{ 0, 44 } }, .kind = .{ .string = "\"PascalCase\"" } },
+        .{ .span = .{ .{ 0, 45 }, .{ 0, 51 } }, .kind = .{ .string = "\"😀\"" } },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);
