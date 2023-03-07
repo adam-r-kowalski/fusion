@@ -144,17 +144,18 @@ fn choice(tokens: *Tokens, kind: Kind, choices: []const Choice) Token {
     return .{ .kind = kind, .span = .{ begin, tokens.pos } };
 }
 
-fn newLine(tokens: *Tokens) Token {
+fn newLine(tokens: *Tokens) ?Token {
     tokens.pos[1] = 0;
     var i: usize = 0;
-    while (tokens.source[i] == '\n') : (i += 1) {
+    while (tokens.source.len > i and tokens.source[i] == '\n') : (i += 1) {
         tokens.pos[0] += 1;
     }
     const begin = tokens.pos;
-    while (tokens.source[i] == ' ') : (i += 1) {
+    while (tokens.source.len > i and tokens.source[i] == ' ') : (i += 1) {
         tokens.pos[1] += 1;
     }
     tokens.source = tokens.source[i..];
+    if (tokens.source.len == 0) return null;
     return .{ .kind = .{ .indent = tokens.pos[1] }, .span = .{ begin, tokens.pos } };
 }
 

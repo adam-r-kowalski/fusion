@@ -3,6 +3,8 @@ const std = @import("std");
 const types = @import("../types.zig");
 const Span = types.token.Span;
 const Token = types.token.Token;
+const Tokens = types.token.Tokens;
+const nextToken = @import("../tokenize.zig").nextToken;
 
 fn span(writer: anytype, s: Span) !void {
     const fmt = ".span = .{{ .{{ {}, {} }}, .{{ {}, {} }} }},";
@@ -66,6 +68,12 @@ pub fn tokenAlloc(t: Token, allocator: std.mem.Allocator) ![]const u8 {
 
 pub fn tokens(writer: anytype, ts: []const Token) !void {
     for (ts) |t| try token(writer, t);
+}
+
+pub fn allTokens(writer: anytype, ts: *Tokens) !void {
+    while (nextToken(ts)) |t| {
+        try token(writer, t);
+    }
 }
 
 pub fn tokensAlloc(ts: []const Token, allocator: std.mem.Allocator) ![]const u8 {

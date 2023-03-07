@@ -16,6 +16,23 @@ const Ast = types.ast.Ast;
 
 const Indent = usize;
 
+const Error = error{
+    OutOfMemory,
+    AccessDenied,
+    BrokenPipe,
+    ConnectionResetByPeer,
+    FileTooBig,
+    LockViolation,
+    NoSpaceLeft,
+    InputOutput,
+    NotOpenForWriting,
+    OperationAborted,
+    Unexpected,
+    WouldBlock,
+    SystemResources,
+    DiskQuota,
+};
+
 fn indent(writer: anytype, i: Indent) !void {
     try writer.writeAll("\n");
     var j: usize = 0;
@@ -194,7 +211,7 @@ fn if_(writer: anytype, c: If, i: Indent) !void {
     try writer.writeAll("},");
 }
 
-fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) error{OutOfMemory}!void {
+fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) Error!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
     try indent(writer, i + 1);
