@@ -114,7 +114,6 @@ fn block(context: Context) ![]Expression {
         } else {
             _ = nextToken(context.tokens);
             const indent = token.kind.indent;
-            std.debug.assert(indent > context.indent);
             const indented = withIndent(context, indent);
             while (true) {
                 const expr = try expression(indented);
@@ -185,8 +184,16 @@ fn for_(context: Context, lhs: Token) !Expression {
 fn if_(context: Context, lhs: Token) !Expression {
     const condition = try context.allocator.create(Expression);
     condition.* = try expression(context);
+    if (peekToken(context.tokens)) |token| {
+        if (token.kind == .indent)
+            _ = nextToken(context.tokens);
+    }
     _ = expect(context, .then);
     const then = try block(context);
+    if (peekToken(context.tokens)) |token| {
+        if (token.kind == .indent)
+            _ = nextToken(context.tokens);
+    }
     _ = expect(context, .else_);
     const else_ = try block(context);
     return .{
@@ -232,6 +239,7 @@ fn precedence(parser: Infix) u8 {
                 .arrow => return ARROW,
                 .dot => return DOT,
                 .greater => return COMPARE,
+                .less => return COMPARE,
             }
         },
         .define => return DEFINE,
@@ -264,6 +272,7 @@ fn infix(context: Context, left: Expression) ?Infix {
             .right_arrow => return .{ .binary_op = .arrow },
             .dot => return .{ .binary_op = .dot },
             .greater => return .{ .binary_op = .greater },
+            .less => return .{ .binary_op = .less },
             .equal => return .define,
             .colon => return .annotate,
             .indent, .right_paren, .then, .else_ => return null,

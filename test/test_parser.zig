@@ -598,21 +598,12 @@ test "for expression" {
                                                                         .kind = .{
                                                                             .binary_op = .{
                                                                                 .kind = .dot,
-                                                                                .left = &.{
-                                                                                    .span = .{ .{ 2, 8 }, .{ 2, 9 } },
-                                                                                    .kind = .{ .symbol = "x" },
-                                                                                },
-                                                                                .right = &.{
-                                                                                    .span = .{ .{ 2, 10 }, .{ 2, 11 } },
-                                                                                    .kind = .{ .symbol = "j" },
-                                                                                },
+                                                                                .left = &.{ .span = .{ .{ 2, 8 }, .{ 2, 9 } }, .kind = .{ .symbol = "x" } },
+                                                                                .right = &.{ .span = .{ .{ 2, 10 }, .{ 2, 11 } }, .kind = .{ .symbol = "j" } },
                                                                             },
                                                                         },
                                                                     },
-                                                                    .right = &.{
-                                                                        .span = .{ .{ 2, 12 }, .{ 2, 13 } },
-                                                                        .kind = .{ .symbol = "i" },
-                                                                    },
+                                                                    .right = &.{ .span = .{ .{ 2, 12 }, .{ 2, 13 } }, .kind = .{ .symbol = "i" } },
                                                                 },
                                                             },
                                                         },
@@ -655,11 +646,96 @@ test "if expression" {
                             },
                         },
                     },
-                    .then = &.{
-                        .{ .span = .{ .{ 0, 14 }, .{ 0, 22 } }, .kind = .{ .string = "\"bigger\"" } },
+                    .then = &.{.{ .span = .{ .{ 0, 14 }, .{ 0, 22 } }, .kind = .{ .string = "\"bigger\"" } }},
+                    .else_ = &.{.{ .span = .{ .{ 0, 28 }, .{ 0, 37 } }, .kind = .{ .string = "\"smaller\"" } }},
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "multi line if expression" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\if x > y then
+        \\    "bigger"
+        \\else
+        \\    "smaller"
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 3, 13 } },
+            .kind = .{
+                .if_ = .{
+                    .condition = &.{
+                        .span = .{ .{ 0, 5 }, .{ 0, 6 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .greater,
+                                .left = &.{ .span = .{ .{ 0, 3 }, .{ 0, 4 } }, .kind = .{ .symbol = "x" } },
+                                .right = &.{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .{ .symbol = "y" } },
+                            },
+                        },
                     },
+                    .then = &.{.{ .span = .{ .{ 1, 4 }, .{ 1, 12 } }, .kind = .{ .string = "\"bigger\"" } }},
+                    .else_ = &.{.{ .span = .{ .{ 3, 4 }, .{ 3, 13 } }, .kind = .{ .string = "\"smaller\"" } }},
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "chained if expression" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\if x > y then "bigger"
+        \\else if x < y then "smaller"
+        \\else "equal"
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 2, 12 } },
+            .kind = .{
+                .if_ = .{
+                    .condition = &.{
+                        .span = .{ .{ 0, 5 }, .{ 0, 6 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .greater,
+                                .left = &.{ .span = .{ .{ 0, 3 }, .{ 0, 4 } }, .kind = .{ .symbol = "x" } },
+                                .right = &.{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .{ .symbol = "y" } },
+                            },
+                        },
+                    },
+                    .then = &.{.{ .span = .{ .{ 0, 14 }, .{ 0, 22 } }, .kind = .{ .string = "\"bigger\"" } }},
                     .else_ = &.{
-                        .{ .span = .{ .{ 0, 28 }, .{ 0, 37 } }, .kind = .{ .string = "\"smaller\"" } },
+                        .{
+                            .span = .{ .{ 1, 5 }, .{ 2, 12 } },
+                            .kind = .{
+                                .if_ = .{
+                                    .condition = &.{
+                                        .span = .{ .{ 1, 10 }, .{ 1, 11 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .kind = .less,
+                                                .left = &.{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .symbol = "x" } },
+                                                .right = &.{ .span = .{ .{ 1, 12 }, .{ 1, 13 } }, .kind = .{ .symbol = "y" } },
+                                            },
+                                        },
+                                    },
+                                    .then = &.{.{ .span = .{ .{ 1, 19 }, .{ 1, 28 } }, .kind = .{ .string = "\"smaller\"" } }},
+                                    .else_ = &.{.{ .span = .{ .{ 2, 5 }, .{ 2, 12 } }, .kind = .{ .string = "\"equal\"" } }},
+                                },
+                            },
+                        },
                     },
                 },
             },

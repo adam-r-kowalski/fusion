@@ -10,6 +10,7 @@ pub const BinaryOpKind = enum {
     arrow,
     dot,
     greater,
+    less,
 };
 
 pub const BinaryOp = struct {

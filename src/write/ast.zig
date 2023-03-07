@@ -54,6 +54,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .arrow => ".arrow",
         .dot => ".dot",
         .greater => ".greater",
+        .less => ".less",
     };
 }
 

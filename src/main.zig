@@ -47,7 +47,17 @@ fn printAst() !void {
     const t0 = timer.read();
     const allocator = std.heap.page_allocator;
     const t1 = timer.read();
-    const file = try std.fs.cwd().readFileAlloc(allocator, "temp/temp.fusion", std.math.maxInt(usize));
+    if (std.os.argv.len < 2) {
+        std.debug.panic(
+            \\
+            \\ERROR - No input file specified
+            \\
+            \\Correct usage: fusion <input file>
+        , .{});
+    }
+    const fileName = std.mem.span(std.os.argv[1]);
+    const maxSize = std.math.maxInt(usize);
+    const file = try std.fs.cwd().readFileAlloc(allocator, fileName, maxSize);
     defer allocator.free(file);
     const t2 = timer.read();
     var tokens = fusion.tokenize.tokenize(file);
