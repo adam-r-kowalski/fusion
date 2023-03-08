@@ -11,6 +11,8 @@ pub const BinaryOpKind = enum {
     dot,
     greater,
     less,
+    equal,
+    rem,
 };
 
 pub const BinaryOp = struct {

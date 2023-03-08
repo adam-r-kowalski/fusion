@@ -193,6 +193,7 @@ fn getToken(tokens: *Tokens) ?Token {
         '^' => return exact(tokens, .caret),
         ',' => return exact(tokens, .comma),
         ':' => return exact(tokens, .colon),
+        '%' => return exact(tokens, .percent),
         '\n' => return newLine(tokens),
         '"' => return string(tokens),
         else => return symbol(tokens),

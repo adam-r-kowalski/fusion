@@ -104,7 +104,7 @@ test "comparison operators" {
 
 test "math operators" {
     const allocator = std.testing.allocator;
-    const source = "+ - * / ^";
+    const source = "+ - * / ^ %";
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
     const expected: []const Token = &.{
@@ -113,6 +113,7 @@ test "math operators" {
         .{ .span = .{ .{ 0, 4 }, .{ 0, 5 } }, .kind = .star },
         .{ .span = .{ .{ 0, 6 }, .{ 0, 7 } }, .kind = .slash },
         .{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .caret },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .percent },
     };
     try expectEqual(expected, actual);
 }

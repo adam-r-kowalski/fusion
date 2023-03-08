@@ -240,6 +240,8 @@ fn precedence(parser: Infix) u8 {
                 .dot => return DOT,
                 .greater => return COMPARE,
                 .less => return COMPARE,
+                .equal => return COMPARE,
+                .rem => return MUL,
             }
         },
         .define => return DEFINE,
@@ -273,6 +275,8 @@ fn infix(context: Context, left: Expression) ?Infix {
             .dot => return .{ .binary_op = .dot },
             .greater => return .{ .binary_op = .greater },
             .less => return .{ .binary_op = .less },
+            .equal_equal => return .{ .binary_op = .equal },
+            .percent => return .{ .binary_op = .rem },
             .equal => return .define,
             .colon => return .annotate,
             .indent, .right_paren, .then, .else_ => return null,

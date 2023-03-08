@@ -39,6 +39,7 @@ pub const Kind = union(enum) {
     when,
     is,
     for_,
+    percent,
 };
 
 /// row, col
