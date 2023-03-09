@@ -276,6 +276,44 @@ test "function call" {
     try expectEqual(expected, actual);
 }
 
+test "nested function call" {
+    const allocator = std.testing.allocator;
+    const source = "f (g 5) h";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 0, 9 } },
+            .kind = .{
+                .call = .{
+                    .func = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "f" } },
+                    .args = &.{
+                        .{
+                            .span = .{ .{ 0, 2 }, .{ 0, 6 } },
+                            .kind = .{
+                                .group = .{
+                                    .expr = &.{
+                                        .span = .{ .{ 0, 3 }, .{ 0, 6 } },
+                                        .kind = .{
+                                            .call = .{
+                                                .func = &.{ .span = .{ .{ 0, 3 }, .{ 0, 4 } }, .kind = .{ .symbol = "g" } },
+                                                .args = &.{.{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .{ .int = "5" } }},
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        .{ .span = .{ .{ 0, 8 }, .{ 0, 9 } }, .kind = .{ .symbol = "h" } },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "single line define" {
     const allocator = std.testing.allocator;
     const source = "x = 5";

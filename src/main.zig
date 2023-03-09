@@ -105,6 +105,6 @@ fn printAst() !void {
 }
 
 pub fn main() !void {
-    // try printAst();
-    try printTokens();
+    try printAst();
+    // try printTokens();
 }

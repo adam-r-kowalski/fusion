@@ -86,7 +86,7 @@ fn prefix(context: Context, token: Token) !Expression {
         .int => |value| return .{ .span = token.span, .kind = .{ .int = value } },
         .string => |value| return .{ .span = token.span, .kind = .{ .string = value } },
         .backslash => return lambda(context, token),
-        .left_paren => return group(context, token),
+        .left_paren => return group(withPrecedence(context, LOWEST), token),
         .for_ => return for_(context, token),
         .if_ => return if_(context, token),
         else => |kind| {
@@ -306,9 +306,13 @@ fn binaryOp(context: Context, lhs: Expression, kind: BinaryOpKind) !Expression {
 fn arguments(context: Context) ![]Expression {
     var args = std.ArrayList(Expression).init(context.allocator);
     while (peekToken(context.tokens)) |token| {
-        if (token.kind == .indent) break;
-        const arg = try expression(context);
-        try args.append(arg);
+        switch (token.kind) {
+            .indent, .right_paren => break,
+            else => {
+                const arg = try expression(context);
+                try args.append(arg);
+            },
+        }
     }
     return args.toOwnedSlice();
 }
@@ -316,7 +320,7 @@ fn arguments(context: Context) ![]Expression {
 fn call(context: Context, lhs: Expression) !Expression {
     const func = try context.allocator.create(Expression);
     func.* = lhs;
-    const args = try arguments(withPrecedence(context, LOWEST));
+    const args = try arguments(withPrecedence(context, HIGHEST));
     return .{
         .span = .{ lhs.span[0], last(args).span[1] },
         .kind = .{ .call = .{ .func = func, .args = args } },
