@@ -151,12 +151,24 @@ fn newLine(tokens: *Tokens) ?Token {
         tokens.pos[0] += 1;
     }
     const begin = tokens.pos;
-    while (tokens.source.len > i and tokens.source[i] == ' ') : (i += 1) {
-        tokens.pos[1] += 1;
-    }
     tokens.source = tokens.source[i..];
     if (tokens.source.len == 0) return null;
-    return .{ .kind = .{ .indent = tokens.pos[1] }, .span = .{ begin, tokens.pos } };
+    i = 0;
+    if (tokens.source[0] == ' ') {
+        while (tokens.source.len > i and tokens.source[i] == ' ') : (i += 1)
+            tokens.pos[1] += 1;
+        tokens.source = tokens.source[i..];
+        if (tokens.source.len == 0) return null;
+        return .{ .kind = .{ .indent = .{ .space = tokens.pos[1] } }, .span = .{ begin, tokens.pos } };
+    }
+    if (tokens.source[0] == '\t') {
+        while (tokens.source.len > i and tokens.source[i] == '\t') : (i += 1)
+            tokens.pos[1] += 1;
+        tokens.source = tokens.source[i..];
+        if (tokens.source.len == 0) return null;
+        return .{ .kind = .{ .indent = .{ .tab = tokens.pos[1] } }, .span = .{ begin, tokens.pos } };
+    }
+    return .{ .kind = .{ .indent = .{ .space = 0 } }, .span = .{ begin, tokens.pos } };
 }
 
 pub fn nextToken(tokens: *Tokens) ?Token {

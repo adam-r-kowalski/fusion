@@ -42,6 +42,36 @@ fn printTime(label: []const u8, start: u64, stop: u64) void {
     });
 }
 
+fn printTokens() !void {
+    var timer = try std.time.Timer.start();
+    const t0 = timer.read();
+    const allocator = std.heap.page_allocator;
+    const t1 = timer.read();
+    if (std.os.argv.len < 2) {
+        std.debug.panic(
+            \\
+            \\ERROR - No input file specified
+            \\
+            \\Correct usage: fusion <input file>
+        , .{});
+    }
+    const fileName = std.mem.span(std.os.argv[1]);
+    const maxSize = std.math.maxInt(usize);
+    const file = try std.fs.cwd().readFileAlloc(allocator, fileName, maxSize);
+    defer allocator.free(file);
+    const t2 = timer.read();
+    const tokens = try fusion.tokenize.tokenizeAlloc(file, allocator);
+    defer allocator.free(tokens);
+    const t3 = timer.read();
+    const writer = std.io.getStdOut().writer();
+    try fusion.write.tokens.tokens(writer, tokens);
+    const t4 = timer.read();
+    printTime("read file", t1, t2);
+    printTime("tokenize", t2, t3);
+    printTime("total", t0, t4);
+    std.debug.print("\n", .{});
+}
+
 fn printAst() !void {
     var timer = try std.time.Timer.start();
     const t0 = timer.read();
@@ -75,5 +105,6 @@ fn printAst() !void {
 }
 
 pub fn main() !void {
-    try printAst();
+    // try printAst();
+    try printTokens();
 }

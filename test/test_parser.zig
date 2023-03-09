@@ -816,3 +816,76 @@ test "if inside lambda" {
     };
     try expectEqual(expected, actual);
 }
+
+test "if inside lambda using tabs" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\doubleIfEven = \x ->
+        \\	if x % 2 == 0 then x * 2 else x
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 13 }, .{ 0, 14 } },
+            .kind = .{
+                .define = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 12 } }, .kind = .{ .symbol = "doubleIfEven" } },
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 0, 15 }, .{ 1, 32 } },
+                            .kind = .{
+                                .lambda = .{
+                                    .params = &.{.{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "x" } }},
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 1, 1 }, .{ 1, 32 } },
+                                            .kind = .{
+                                                .if_ = .{
+                                                    .condition = &.{
+                                                        .span = .{ .{ 1, 10 }, .{ 1, 12 } },
+                                                        .kind = .{
+                                                            .binary_op = .{
+                                                                .kind = .equal,
+                                                                .left = &.{
+                                                                    .span = .{ .{ 1, 6 }, .{ 1, 7 } },
+                                                                    .kind = .{
+                                                                        .binary_op = .{
+                                                                            .kind = .rem,
+                                                                            .left = &.{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
+                                                                            .right = &.{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .int = "2" } },
+                                                                        },
+                                                                    },
+                                                                },
+                                                                .right = &.{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .int = "0" } },
+                                                            },
+                                                        },
+                                                    },
+                                                    .then = &.{
+                                                        .{
+                                                            .span = .{ .{ 1, 22 }, .{ 1, 23 } },
+                                                            .kind = .{
+                                                                .binary_op = .{
+                                                                    .kind = .mul,
+                                                                    .left = &.{ .span = .{ .{ 1, 20 }, .{ 1, 21 } }, .kind = .{ .symbol = "x" } },
+                                                                    .right = &.{ .span = .{ .{ 1, 24 }, .{ 1, 25 } }, .kind = .{ .int = "2" } },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    .else_ = &.{.{ .span = .{ .{ 1, 31 }, .{ 1, 32 } }, .kind = .{ .symbol = "x" } }},
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

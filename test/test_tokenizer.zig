@@ -179,7 +179,7 @@ test "multi line function" {
         .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
-        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = 4 } },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 6 }, .{ 1, 7 } }, .kind = .plus },
         .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .{ .symbol = "x" } },
@@ -239,7 +239,7 @@ test "function declaration and definition" {
         .{ .span = .{ .{ 0, 9 }, .{ 0, 12 } }, .kind = .{ .symbol = "F32" } },
         .{ .span = .{ .{ 0, 13 }, .{ 0, 15 } }, .kind = .right_arrow },
         .{ .span = .{ .{ 0, 16 }, .{ 0, 19 } }, .kind = .{ .symbol = "F32" } },
-        .{ .span = .{ .{ 1, 0 }, .{ 1, 0 } }, .kind = .{ .indent = 0 } },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 0 } }, .kind = .{ .indent = .{ .space = 0 } } },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 6 } }, .kind = .{ .symbol = "double" } },
         .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .backslash },
@@ -269,19 +269,19 @@ test "multiple indentations in one function" {
         .{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "y" } },
         .{ .span = .{ .{ 0, 18 }, .{ 0, 20 } }, .kind = .right_arrow },
-        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = 4 } },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 6 } }, .kind = .{ .symbol = "x2" } },
         .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .caret },
         .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .int = "2" } },
-        .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .{ .indent = 4 } },
+        .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 2, 4 }, .{ 2, 6 } }, .kind = .{ .symbol = "y2" } },
         .{ .span = .{ .{ 2, 7 }, .{ 2, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 2, 9 }, .{ 2, 10 } }, .kind = .{ .symbol = "y" } },
         .{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .caret },
         .{ .span = .{ .{ 2, 13 }, .{ 2, 14 } }, .kind = .{ .int = "2" } },
-        .{ .span = .{ .{ 3, 0 }, .{ 3, 4 } }, .kind = .{ .indent = 4 } },
+        .{ .span = .{ .{ 3, 0 }, .{ 3, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 3, 4 }, .{ 3, 6 } }, .kind = .{ .symbol = "x2" } },
         .{ .span = .{ .{ 3, 7 }, .{ 3, 8 } }, .kind = .plus },
         .{ .span = .{ .{ 3, 9 }, .{ 3, 11 } }, .kind = .{ .symbol = "y2" } },
@@ -320,6 +320,28 @@ test "string" {
         .{ .span = .{ .{ 0, 19 }, .{ 0, 31 } }, .kind = .{ .string = "\"snake_case\"" } },
         .{ .span = .{ .{ 0, 32 }, .{ 0, 44 } }, .kind = .{ .string = "\"PascalCase\"" } },
         .{ .span = .{ .{ 0, 45 }, .{ 0, 51 } }, .kind = .{ .string = "\"😀\"" } },
+    };
+    try expectEqual(expected, actual);
+}
+
+test "indent using tab" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\double = \x ->
+        \\	x + x
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 1 } }, .kind = .{ .indent = .{ .tab = 1 } } },
+        .{ .span = .{ .{ 1, 1 }, .{ 1, 2 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 3 }, .{ 1, 4 } }, .kind = .plus },
+        .{ .span = .{ .{ 1, 5 }, .{ 1, 6 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqual(expected, actual);
 }

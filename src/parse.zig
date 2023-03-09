@@ -8,6 +8,7 @@ const Token = types.token.Token;
 const Position = types.token.Position;
 const TokenKind = types.token.Kind;
 pub const Span = types.token.Span;
+const Indent = types.token.Indent;
 const Ast = types.ast.Ast;
 const Expression = types.ast.Expression;
 const BinaryOpKind = types.ast.BinaryOpKind;
@@ -22,7 +23,7 @@ pub fn parse(tokens: *Tokens, allocator: Allocator) !Ast {
         .allocator = arena.allocator(),
         .tokens = tokens,
         .precedence = LOWEST,
-        .indent = 0,
+        .indent = .{ .space = 0 },
     };
     while (peekToken(tokens)) |token| {
         if (token.kind == .indent) {
@@ -38,7 +39,7 @@ const Context = struct {
     allocator: Allocator,
     tokens: *Tokens,
     precedence: u8,
-    indent: usize,
+    indent: Indent,
 };
 
 fn withPrecedence(context: Context, p: u8) Context {
@@ -50,7 +51,7 @@ fn withPrecedence(context: Context, p: u8) Context {
     };
 }
 
-fn withIndent(context: Context, i: usize) Context {
+fn withIndent(context: Context, i: Indent) Context {
     return .{
         .allocator = context.allocator,
         .tokens = context.tokens,
@@ -120,7 +121,7 @@ fn block(context: Context) ![]Expression {
                 try body.append(expr);
                 if (peekToken(indented.tokens)) |t| {
                     if (t.kind != .indent) break;
-                    if (t.kind.indent != indent) break;
+                    if (!std.meta.eql(t.kind.indent, indent)) break;
                     _ = nextToken(indented.tokens);
                 } else break;
             }

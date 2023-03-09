@@ -1,3 +1,8 @@
+pub const Indent = union(enum) {
+    space: usize,
+    tab: usize,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
@@ -32,7 +37,7 @@ pub const Kind = union(enum) {
     left_arrow,
     right_arrow,
     fat_arrow,
-    indent: usize,
+    indent: Indent,
     if_,
     then,
     else_,
