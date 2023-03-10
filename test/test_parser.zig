@@ -1038,3 +1038,70 @@ test "interface" {
     };
     try expectEqual(expected, actual);
 }
+
+test "array annotation in function" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\transpose : m=>n=>I32 -> n=>m=>I32
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 10 }, .{ 0, 11 } },
+            .kind = .{
+                .annotate = .{
+                    .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 9 } }, .kind = .{ .symbol = "transpose" } },
+                    .type = &.{
+                        .span = .{ .{ 0, 22 }, .{ 0, 24 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .arrow,
+                                .left = &.{
+                                    .span = .{ .{ 0, 13 }, .{ 0, 15 } },
+                                    .kind = .{
+                                        .binary_op = .{
+                                            .kind = .fat_arrow,
+                                            .left = &.{ .span = .{ .{ 0, 12 }, .{ 0, 13 } }, .kind = .{ .symbol = "m" } },
+                                            .right = &.{
+                                                .span = .{ .{ 0, 16 }, .{ 0, 18 } },
+                                                .kind = .{
+                                                    .binary_op = .{
+                                                        .kind = .fat_arrow,
+                                                        .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "n" } },
+                                                        .right = &.{ .span = .{ .{ 0, 18 }, .{ 0, 21 } }, .kind = .{ .symbol = "I32" } },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                                .right = &.{
+                                    .span = .{ .{ 0, 26 }, .{ 0, 28 } },
+                                    .kind = .{
+                                        .binary_op = .{
+                                            .kind = .fat_arrow,
+                                            .left = &.{ .span = .{ .{ 0, 25 }, .{ 0, 26 } }, .kind = .{ .symbol = "n" } },
+                                            .right = &.{
+                                                .span = .{ .{ 0, 29 }, .{ 0, 31 } },
+                                                .kind = .{
+                                                    .binary_op = .{
+                                                        .kind = .fat_arrow,
+                                                        .left = &.{ .span = .{ .{ 0, 28 }, .{ 0, 29 } }, .kind = .{ .symbol = "m" } },
+                                                        .right = &.{ .span = .{ .{ 0, 31 }, .{ 0, 34 } }, .kind = .{ .symbol = "I32" } },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

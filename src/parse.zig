@@ -238,7 +238,8 @@ const LOWEST = 0;
 const DEFINE = LOWEST;
 const ANNOTATE = DEFINE;
 const ARROW = ANNOTATE + DELTA;
-const PIPE = ARROW + DELTA;
+const FAT_ARROW = ARROW + DELTA;
+const PIPE = FAT_ARROW + DELTA;
 const COMPARE = PIPE + DELTA;
 const ADD = COMPARE + DELTA;
 const MUL = ADD + DELTA;
@@ -262,6 +263,7 @@ fn precedence(parser: Infix) u8 {
                 .mul => return MUL,
                 .pow => return POW,
                 .arrow => return ARROW,
+                .fat_arrow => return FAT_ARROW,
                 .dot => return DOT,
                 .greater => return COMPARE,
                 .less => return COMPARE,
@@ -282,7 +284,7 @@ fn associativity(parser: Infix) Associativity {
     switch (parser) {
         .binary_op => |op| {
             switch (op) {
-                .pow, .arrow => return .right,
+                .pow, .arrow, .fat_arrow => return .right,
                 else => return .left,
             }
         },
@@ -298,6 +300,7 @@ fn infix(context: Context, left: Expression) ?Infix {
             .star => return .{ .binary_op = .mul },
             .caret => return .{ .binary_op = .pow },
             .right_arrow => return .{ .binary_op = .arrow },
+            .fat_arrow => return .{ .binary_op = .fat_arrow },
             .dot => return .{ .binary_op = .dot },
             .greater => return .{ .binary_op = .greater },
             .less => return .{ .binary_op = .less },

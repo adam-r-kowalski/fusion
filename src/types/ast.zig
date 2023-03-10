@@ -8,6 +8,7 @@ pub const BinaryOpKind = enum {
     mul,
     pow,
     arrow,
+    fat_arrow,
     dot,
     greater,
     less,

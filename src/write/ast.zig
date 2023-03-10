@@ -53,6 +53,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .mul => ".mul",
         .pow => ".pow",
         .arrow => ".arrow",
+        .fat_arrow => ".fat_arrow",
         .dot => ".dot",
         .greater => ".greater",
         .less => ".less",
