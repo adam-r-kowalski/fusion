@@ -57,6 +57,12 @@ pub const If = struct {
     else_: []const Expression,
 };
 
+pub const Interface = struct {
+    name: *const Expression,
+    params: []const Expression,
+    body: []const Expression,
+};
+
 pub const Kind = union(enum) {
     symbol: []const u8,
     int: []const u8,
@@ -69,6 +75,7 @@ pub const Kind = union(enum) {
     group: Group,
     for_: For,
     if_: If,
+    interface: Interface,
 };
 
 pub const Expression = struct {

@@ -46,6 +46,7 @@ pub const Kind = union(enum) {
     for_,
     percent,
     pipe,
+    interface,
 };
 
 /// row, col

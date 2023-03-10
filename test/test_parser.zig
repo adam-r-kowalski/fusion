@@ -976,3 +976,65 @@ test "pipe" {
     };
     try expectEqual(expected, actual);
 }
+
+test "interface" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\interface Add a
+        \\    add : a -> a -> a
+        \\    zero : a
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 2, 10 } },
+            .kind = .{
+                .interface = .{
+                    .name = &.{ .span = .{ .{ 0, 10 }, .{ 0, 13 } }, .kind = .{ .symbol = "Add" } },
+                    .params = &.{.{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "a" } }},
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 1, 8 }, .{ 1, 9 } },
+                            .kind = .{
+                                .annotate = .{
+                                    .name = &.{ .span = .{ .{ 1, 4 }, .{ 1, 7 } }, .kind = .{ .symbol = "add" } },
+                                    .type = &.{
+                                        .span = .{ .{ 1, 12 }, .{ 1, 14 } },
+                                        .kind = .{
+                                            .binary_op = .{
+                                                .kind = .arrow,
+                                                .left = &.{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .{ .symbol = "a" } },
+                                                .right = &.{
+                                                    .span = .{ .{ 1, 17 }, .{ 1, 19 } },
+                                                    .kind = .{
+                                                        .binary_op = .{
+                                                            .kind = .arrow,
+                                                            .left = &.{ .span = .{ .{ 1, 15 }, .{ 1, 16 } }, .kind = .{ .symbol = "a" } },
+                                                            .right = &.{ .span = .{ .{ 1, 20 }, .{ 1, 21 } }, .kind = .{ .symbol = "a" } },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        .{
+                            .span = .{ .{ 2, 9 }, .{ 2, 10 } },
+                            .kind = .{
+                                .annotate = .{
+                                    .name = &.{ .span = .{ .{ 2, 4 }, .{ 2, 8 } }, .kind = .{ .symbol = "zero" } },
+                                    .type = &.{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .{ .symbol = "a" } },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

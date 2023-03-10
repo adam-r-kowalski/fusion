@@ -89,6 +89,7 @@ fn prefix(context: Context, token: Token) !Expression {
         .left_paren => return group(withPrecedence(context, LOWEST), token),
         .for_ => return for_(context, token),
         .if_ => return if_(context, token),
+        .interface => return interface(context, token),
         else => |kind| {
             std.debug.print("\nno prefix parser for {}!", .{kind});
             unreachable;
@@ -204,6 +205,28 @@ fn if_(context: Context, lhs: Token) !Expression {
                 .condition = condition,
                 .then = then,
                 .else_ = else_,
+            },
+        },
+    };
+}
+
+fn interface(context: Context, lhs: Token) !Expression {
+    const name = try context.allocator.create(Expression);
+    name.* = try expression(withPrecedence(context, HIGHEST));
+    var params = std.ArrayList(Expression).init(context.allocator);
+    while (peekToken(context.tokens)) |token| {
+        if (token.kind == .indent) break;
+        const param = try expression(context);
+        try params.append(param);
+    }
+    const body = try block(context);
+    return .{
+        .span = .{ lhs.span[0], last(body).span[1] },
+        .kind = .{
+            .interface = .{
+                .name = name,
+                .params = params.toOwnedSlice(),
+                .body = body,
             },
         },
     };

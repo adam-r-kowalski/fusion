@@ -12,6 +12,7 @@ const Annotate = types.ast.Annotate;
 const Group = types.ast.Group;
 const For = types.ast.For;
 const If = types.ast.If;
+const Interface = types.ast.Interface;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -101,10 +102,10 @@ fn define(writer: anytype, d: Define, i: Indent) !void {
     try indent(writer, i + 2);
     try writer.writeAll(".define = .{");
     try indent(writer, i + 3);
-    try writer.writeAll(".name = &.{");
+    try writer.writeAll(".name = &");
     try expression(writer, d.name.*, i + 3, false);
     try indent(writer, i + 3);
-    try writer.writeAll(".body = &.{");
+    try writer.writeAll(".body = &");
     for (d.body) |expr| {
         try expression(writer, expr, i + 4, true);
     }
@@ -143,10 +144,10 @@ fn annotate(writer: anytype, a: Annotate, i: Indent) !void {
     try indent(writer, i + 2);
     try writer.writeAll(".annotate = .{");
     try indent(writer, i + 3);
-    try writer.writeAll(".name = &.{");
+    try writer.writeAll(".name = &");
     try expression(writer, a.name.*, i + 3, false);
     try indent(writer, i + 3);
-    try writer.writeAll(".type = &.{");
+    try writer.writeAll(".type = &");
     try expression(writer, a.type.*, i + 3, false);
     try indent(writer, i + 2);
     try writer.writeAll("},");
@@ -158,7 +159,7 @@ fn group(writer: anytype, g: Group, i: Indent) !void {
     try indent(writer, i + 2);
     try writer.writeAll(".group = .{");
     try indent(writer, i + 3);
-    try writer.writeAll(".expr = &.{");
+    try writer.writeAll(".expr = &");
     try expression(writer, g.expr.*, i + 3, false);
     try indent(writer, i + 2);
     try writer.writeAll("},");
@@ -215,6 +216,32 @@ fn if_(writer: anytype, c: If, i: Indent) !void {
     try writer.writeAll("},");
 }
 
+fn interface(writer: anytype, c: Interface, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".interface = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".name = &.{");
+    try expression(writer, c.name.*, i + 3, false);
+    try indent(writer, i + 3);
+    try writer.writeAll(".params = &.{");
+    for (c.params) |p| {
+        try expression(writer, p, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 3);
+    try writer.writeAll(".body = &.{");
+    for (c.body) |e| {
+        try expression(writer, e, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
 fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) Error!void {
     if (newline) try indent(writer, i);
     try writer.writeAll(".{");
@@ -234,6 +261,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) Error!vo
         .group => |g| try group(writer, g, i),
         .for_ => |f| try for_(writer, f, i),
         .if_ => |c| try if_(writer, c, i),
+        .interface => |c| try interface(writer, c, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");

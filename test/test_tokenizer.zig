@@ -364,6 +364,35 @@ test "pipeline" {
     try expectEqual(expected, actual);
 }
 
+test "interface" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\interface Add a
+        \\    add : a -> a -> a
+        \\    zero : a
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 9 } }, .kind = .interface },
+        .{ .span = .{ .{ 0, 10 }, .{ 0, 13 } }, .kind = .{ .symbol = "Add" } },
+        .{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "a" } },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
+        .{ .span = .{ .{ 1, 4 }, .{ 1, 7 } }, .kind = .{ .symbol = "add" } },
+        .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .colon },
+        .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .{ .symbol = "a" } },
+        .{ .span = .{ .{ 1, 12 }, .{ 1, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 15 }, .{ 1, 16 } }, .kind = .{ .symbol = "a" } },
+        .{ .span = .{ .{ 1, 17 }, .{ 1, 19 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 20 }, .{ 1, 21 } }, .kind = .{ .symbol = "a" } },
+        .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
+        .{ .span = .{ .{ 2, 4 }, .{ 2, 8 } }, .kind = .{ .symbol = "zero" } },
+        .{ .span = .{ .{ 2, 9 }, .{ 2, 10 } }, .kind = .colon },
+        .{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .{ .symbol = "a" } },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);

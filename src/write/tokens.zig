@@ -58,6 +58,7 @@ pub fn token(writer: anytype, t: Token) !void {
         .for_ => try writer.writeAll(".for_"),
         .percent => try writer.writeAll(".percent"),
         .pipe => try writer.writeAll(".pipe"),
+        .interface => try writer.writeAll(".interface"),
     }
     try writer.writeAll(" },");
 }
