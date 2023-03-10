@@ -1105,3 +1105,73 @@ test "array annotation in function" {
     };
     try expectEqual(expected, actual);
 }
+
+test "instance" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\instance Add I32
+        \\    add = \x y -> addI32 x y
+        \\    zero = 0
+    ;
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 0 }, .{ 2, 10 } },
+            .kind = .{
+                .instance = .{
+                    .name = &.{ .span = .{ .{ 0, 9 }, .{ 0, 12 } }, .kind = .{ .symbol = "Add" } },
+                    .args = &.{.{ .span = .{ .{ 0, 13 }, .{ 0, 16 } }, .kind = .{ .symbol = "I32" } }},
+                    .body = &.{
+                        .{
+                            .span = .{ .{ 1, 8 }, .{ 1, 9 } },
+                            .kind = .{
+                                .define = .{
+                                    .name = &.{ .span = .{ .{ 1, 4 }, .{ 1, 7 } }, .kind = .{ .symbol = "add" } },
+                                    .body = &.{
+                                        .{
+                                            .span = .{ .{ 1, 10 }, .{ 1, 28 } },
+                                            .kind = .{
+                                                .lambda = .{
+                                                    .params = &.{
+                                                        .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .{ .symbol = "x" } },
+                                                        .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .symbol = "y" } },
+                                                    },
+                                                    .body = &.{
+                                                        .{
+                                                            .span = .{ .{ 1, 18 }, .{ 1, 28 } },
+                                                            .kind = .{
+                                                                .call = .{
+                                                                    .func = &.{ .span = .{ .{ 1, 18 }, .{ 1, 24 } }, .kind = .{ .symbol = "addI32" } },
+                                                                    .args = &.{
+                                                                        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "x" } },
+                                                                        .{ .span = .{ .{ 1, 27 }, .{ 1, 28 } }, .kind = .{ .symbol = "y" } },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        .{
+                            .span = .{ .{ 2, 9 }, .{ 2, 10 } },
+                            .kind = .{
+                                .define = .{
+                                    .name = &.{ .span = .{ .{ 2, 4 }, .{ 2, 8 } }, .kind = .{ .symbol = "zero" } },
+                                    .body = &.{.{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .{ .int = "0" } }},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

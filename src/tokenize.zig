@@ -119,6 +119,7 @@ fn symbol(tokens: *Tokens) Token {
     if (eql(u8, value, "is")) return .{ .span = span, .kind = .is };
     if (eql(u8, value, "for")) return .{ .span = span, .kind = .for_ };
     if (eql(u8, value, "interface")) return .{ .span = span, .kind = .interface };
+    if (eql(u8, value, "instance")) return .{ .span = span, .kind = .instance };
     return .{ .span = span, .kind = .{ .symbol = value } };
 }
 

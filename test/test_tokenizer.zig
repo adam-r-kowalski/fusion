@@ -393,6 +393,37 @@ test "interface" {
     try expectEqual(expected, actual);
 }
 
+test "instance" {
+    const allocator = std.testing.allocator;
+    const source =
+        \\instance Add I32
+        \\    add = \x y -> addI32 x y
+        \\    zero = 0
+    ;
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 8 } }, .kind = .instance },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 12 } }, .kind = .{ .symbol = "Add" } },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 16 } }, .kind = .{ .symbol = "I32" } },
+        .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
+        .{ .span = .{ .{ 1, 4 }, .{ 1, 7 } }, .kind = .{ .symbol = "add" } },
+        .{ .span = .{ .{ 1, 8 }, .{ 1, 9 } }, .kind = .equal },
+        .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .backslash },
+        .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .symbol = "y" } },
+        .{ .span = .{ .{ 1, 15 }, .{ 1, 17 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 1, 18 }, .{ 1, 24 } }, .kind = .{ .symbol = "addI32" } },
+        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 27 }, .{ 1, 28 } }, .kind = .{ .symbol = "y" } },
+        .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
+        .{ .span = .{ .{ 2, 4 }, .{ 2, 8 } }, .kind = .{ .symbol = "zero" } },
+        .{ .span = .{ .{ 2, 9 }, .{ 2, 10 } }, .kind = .equal },
+        .{ .span = .{ .{ 2, 11 }, .{ 2, 12 } }, .kind = .{ .int = "0" } },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);

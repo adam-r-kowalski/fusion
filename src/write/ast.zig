@@ -13,6 +13,7 @@ const Group = types.ast.Group;
 const For = types.ast.For;
 const If = types.ast.If;
 const Interface = types.ast.Interface;
+const Instance = types.ast.Instance;
 const Ast = types.ast.Ast;
 
 const Indent = usize;
@@ -106,7 +107,7 @@ fn define(writer: anytype, d: Define, i: Indent) !void {
     try writer.writeAll(".name = &");
     try expression(writer, d.name.*, i + 3, false);
     try indent(writer, i + 3);
-    try writer.writeAll(".body = &");
+    try writer.writeAll(".body = &{");
     for (d.body) |expr| {
         try expression(writer, expr, i + 4, true);
     }
@@ -221,12 +222,38 @@ fn interface(writer: anytype, c: Interface, i: Indent) !void {
     try indent(writer, i + 2);
     try writer.writeAll(".interface = .{");
     try indent(writer, i + 3);
-    try writer.writeAll(".name = &.{");
+    try writer.writeAll(".name = &");
     try expression(writer, c.name.*, i + 3, false);
     try indent(writer, i + 3);
     try writer.writeAll(".params = &.{");
     for (c.params) |p| {
         try expression(writer, p, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 3);
+    try writer.writeAll(".body = &.{");
+    for (c.body) |e| {
+        try expression(writer, e, i + 4, true);
+    }
+    try indent(writer, i + 3);
+    try writer.writeAll("},");
+    try indent(writer, i + 2);
+    try writer.writeAll("},");
+    try indent(writer, i + 1);
+    try writer.writeAll("},");
+}
+
+fn instance(writer: anytype, c: Instance, i: Indent) !void {
+    try indent(writer, i + 2);
+    try writer.writeAll(".instance = .{");
+    try indent(writer, i + 3);
+    try writer.writeAll(".name = &");
+    try expression(writer, c.name.*, i + 3, false);
+    try indent(writer, i + 3);
+    try writer.writeAll(".args = &.{");
+    for (c.args) |a| {
+        try expression(writer, a, i + 4, true);
     }
     try indent(writer, i + 3);
     try writer.writeAll("},");
@@ -263,6 +290,7 @@ fn expression(writer: anytype, e: Expression, i: Indent, newline: bool) Error!vo
         .for_ => |f| try for_(writer, f, i),
         .if_ => |c| try if_(writer, c, i),
         .interface => |c| try interface(writer, c, i),
+        .instance => |c| try instance(writer, c, i),
     }
     try indent(writer, i);
     try writer.writeAll("},");
