@@ -346,6 +346,24 @@ test "indent using tab" {
     try expectEqual(expected, actual);
 }
 
+test "pipeline" {
+    const allocator = std.testing.allocator;
+    const source = "a |> f b c |> g d";
+    const actual = try tokenizeAlloc(source, allocator);
+    defer allocator.free(actual);
+    const expected: []const Token = &.{
+        .{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "a" } },
+        .{ .span = .{ .{ 0, 2 }, .{ 0, 4 } }, .kind = .pipe },
+        .{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .{ .symbol = "f" } },
+        .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .{ .symbol = "b" } },
+        .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .{ .symbol = "c" } },
+        .{ .span = .{ .{ 0, 11 }, .{ 0, 13 } }, .kind = .pipe },
+        .{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "g" } },
+        .{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "d" } },
+    };
+    try expectEqual(expected, actual);
+}
+
 test "next and peek" {
     const source = "x + y";
     var tokens = tokenize(source);

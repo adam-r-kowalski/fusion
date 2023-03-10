@@ -13,6 +13,7 @@ pub const BinaryOpKind = enum {
     less,
     equal,
     rem,
+    pipe,
 };
 
 pub const BinaryOp = struct {

@@ -927,3 +927,52 @@ test "if inside lambda using tabs" {
     };
     try expectEqual(expected, actual);
 }
+
+test "pipe" {
+    const allocator = std.testing.allocator;
+    const source = "a |> f b c |> g d";
+    var tokens = tokenize(source);
+    const actual = try parse(&tokens, allocator);
+    defer actual.deinit();
+    const expected: []const Expression = &.{
+        .{
+            .span = .{ .{ 0, 11 }, .{ 0, 13 } },
+            .kind = .{
+                .binary_op = .{
+                    .kind = .pipe,
+                    .left = &.{
+                        .span = .{ .{ 0, 2 }, .{ 0, 4 } },
+                        .kind = .{
+                            .binary_op = .{
+                                .kind = .pipe,
+                                .left = &.{ .span = .{ .{ 0, 0 }, .{ 0, 1 } }, .kind = .{ .symbol = "a" } },
+                                .right = &.{
+                                    .span = .{ .{ 0, 5 }, .{ 0, 10 } },
+                                    .kind = .{
+                                        .call = .{
+                                            .func = &.{ .span = .{ .{ 0, 5 }, .{ 0, 6 } }, .kind = .{ .symbol = "f" } },
+                                            .args = &.{
+                                                .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .{ .symbol = "b" } },
+                                                .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .{ .symbol = "c" } },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    .right = &.{
+                        .span = .{ .{ 0, 14 }, .{ 0, 17 } },
+                        .kind = .{
+                            .call = .{
+                                .func = &.{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "g" } },
+                                .args = &.{.{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "d" } }},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    try expectEqual(expected, actual);
+}

@@ -198,6 +198,7 @@ fn getToken(tokens: *Tokens) ?Token {
         '<' => return choice(tokens, .less, &.{ .{ '=', .less_equal }, .{ '-', .left_arrow } }),
         '>' => return choice(tokens, .greater, &.{.{ '=', .greater_equal }}),
         '!' => return choice(tokens, .bang, &.{.{ '=', .bang_equal }}),
+        '|' => return choice(tokens, .bang, &.{.{ '>', .pipe }}),
         '+' => return exact(tokens, .plus),
         '*' => return exact(tokens, .star),
         '/' => return exact(tokens, .slash),

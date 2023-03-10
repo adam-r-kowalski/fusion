@@ -57,6 +57,7 @@ fn opName(kind: BinaryOpKind) []const u8 {
         .less => ".less",
         .equal => ".equal",
         .rem => ".rem",
+        .pipe => ".pipe",
     };
 }
 

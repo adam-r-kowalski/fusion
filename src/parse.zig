@@ -215,7 +215,8 @@ const LOWEST = 0;
 const DEFINE = LOWEST;
 const ANNOTATE = DEFINE;
 const ARROW = ANNOTATE + DELTA;
-const COMPARE = ARROW + DELTA;
+const PIPE = ARROW + DELTA;
+const COMPARE = PIPE + DELTA;
 const ADD = COMPARE + DELTA;
 const MUL = ADD + DELTA;
 const POW = MUL + DELTA;
@@ -243,6 +244,7 @@ fn precedence(parser: Infix) u8 {
                 .less => return COMPARE,
                 .equal => return COMPARE,
                 .rem => return MUL,
+                .pipe => return PIPE,
             }
         },
         .define => return DEFINE,
@@ -278,6 +280,7 @@ fn infix(context: Context, left: Expression) ?Infix {
             .less => return .{ .binary_op = .less },
             .equal_equal => return .{ .binary_op = .equal },
             .percent => return .{ .binary_op = .rem },
+            .pipe => return .{ .binary_op = .pipe },
             .equal => return .define,
             .colon => return .annotate,
             .indent, .right_paren, .then, .else_ => return null,
@@ -307,7 +310,7 @@ fn arguments(context: Context) ![]Expression {
     var args = std.ArrayList(Expression).init(context.allocator);
     while (peekToken(context.tokens)) |token| {
         switch (token.kind) {
-            .indent, .right_paren => break,
+            .indent, .right_paren, .pipe => break,
             else => {
                 const arg = try expression(context);
                 try args.append(arg);
