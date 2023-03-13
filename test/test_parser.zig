@@ -391,7 +391,7 @@ test "multi line define" {
 test "single line lambda" {
     const allocator = std.testing.allocator;
     const source =
-        \\double = \x -> x * 2
+        \\double = \x. x * 2
     ;
     var tokens = tokenize(source);
     const actual = try parse(&tokens, allocator);
@@ -404,18 +404,18 @@ test "single line lambda" {
                     .name = &.{ .span = .{ .{ 0, 0 }, .{ 0, 6 } }, .kind = .{ .symbol = "double" } },
                     .body = &.{
                         .{
-                            .span = .{ .{ 0, 9 }, .{ 0, 18 } },
+                            .span = .{ .{ 0, 9 }, .{ 0, 16 } },
                             .kind = .{
                                 .lambda = .{
                                     .params = &.{.{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } }},
                                     .body = &.{
                                         .{
-                                            .span = .{ .{ 0, 17 }, .{ 0, 18 } },
+                                            .span = .{ .{ 0, 15 }, .{ 0, 16 } },
                                             .kind = .{
                                                 .binary_op = .{
                                                     .kind = .mul,
-                                                    .left = &.{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
-                                                    .right = &.{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .int = "2" } },
+                                                    .left = &.{ .span = .{ .{ 0, 13 }, .{ 0, 14 } }, .kind = .{ .symbol = "x" } },
+                                                    .right = &.{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .{ .int = "2" } },
                                                 },
                                             },
                                         },
@@ -434,7 +434,7 @@ test "single line lambda" {
 test "multi line lambda" {
     const allocator = std.testing.allocator;
     const source =
-        \\sumOfSquares = \x y ->
+        \\sumOfSquares = \x y.
         \\    x2 = x ^ 2
         \\    y2 = y ^ 2
         \\    x2 + y2
@@ -524,7 +524,7 @@ test "function annotation" {
     const allocator = std.testing.allocator;
     const source =
         \\add : I32 -> I32 -> I32
-        \\add = \x y -> x + y
+        \\add = \x y. x + y
     ;
     var tokens = tokenize(source);
     const ast = try parse(&tokens, allocator);
@@ -564,7 +564,7 @@ test "function annotation" {
                     .name = &.{ .span = .{ .{ 1, 0 }, .{ 1, 3 } }, .kind = .{ .symbol = "add" } },
                     .body = &.{
                         .{
-                            .span = .{ .{ 1, 6 }, .{ 1, 17 } },
+                            .span = .{ .{ 1, 6 }, .{ 1, 15 } },
                             .kind = .{
                                 .lambda = .{
                                     .params = &.{
@@ -573,12 +573,12 @@ test "function annotation" {
                                     },
                                     .body = &.{
                                         .{
-                                            .span = .{ .{ 1, 16 }, .{ 1, 17 } },
+                                            .span = .{ .{ 1, 14 }, .{ 1, 15 } },
                                             .kind = .{
                                                 .binary_op = .{
                                                     .kind = .add,
-                                                    .left = &.{ .span = .{ .{ 1, 14 }, .{ 1, 15 } }, .kind = .{ .symbol = "x" } },
-                                                    .right = &.{ .span = .{ .{ 1, 18 }, .{ 1, 19 } }, .kind = .{ .symbol = "y" } },
+                                                    .left = &.{ .span = .{ .{ 1, 12 }, .{ 1, 13 } }, .kind = .{ .symbol = "x" } },
+                                                    .right = &.{ .span = .{ .{ 1, 16 }, .{ 1, 17 } }, .kind = .{ .symbol = "y" } },
                                                 },
                                             },
                                         },
@@ -597,8 +597,8 @@ test "function annotation" {
 test "for expression" {
     const allocator = std.testing.allocator;
     const source =
-        \\transpose = \x ->
-        \\    for i j ->
+        \\transpose = \x.
+        \\    for i j.
         \\        x.j.i
     ;
     var tokens = tokenize(source);
@@ -785,7 +785,7 @@ test "chained if expression" {
 test "if inside lambda" {
     const allocator = std.testing.allocator;
     const source =
-        \\doubleIfEven = \x ->
+        \\doubleIfEven = \x.
         \\    if x % 2 == 0 then x * 2 else x
     ;
     var tokens = tokenize(source);
@@ -858,7 +858,7 @@ test "if inside lambda" {
 test "if inside lambda using tabs" {
     const allocator = std.testing.allocator;
     const source =
-        \\doubleIfEven = \x ->
+        \\doubleIfEven = \x.
         \\	if x % 2 == 0 then x * 2 else x
     ;
     var tokens = tokenize(source);
@@ -1110,7 +1110,7 @@ test "instance" {
     const allocator = std.testing.allocator;
     const source =
         \\instance Add I32
-        \\    add = \x y -> addI32 x y
+        \\    add = \x y. addI32 x y
         \\    zero = 0
     ;
     var tokens = tokenize(source);
@@ -1131,7 +1131,7 @@ test "instance" {
                                     .name = &.{ .span = .{ .{ 1, 4 }, .{ 1, 7 } }, .kind = .{ .symbol = "add" } },
                                     .body = &.{
                                         .{
-                                            .span = .{ .{ 1, 10 }, .{ 1, 28 } },
+                                            .span = .{ .{ 1, 10 }, .{ 1, 26 } },
                                             .kind = .{
                                                 .lambda = .{
                                                     .params = &.{
@@ -1140,13 +1140,13 @@ test "instance" {
                                                     },
                                                     .body = &.{
                                                         .{
-                                                            .span = .{ .{ 1, 18 }, .{ 1, 28 } },
+                                                            .span = .{ .{ 1, 16 }, .{ 1, 26 } },
                                                             .kind = .{
                                                                 .call = .{
-                                                                    .func = &.{ .span = .{ .{ 1, 18 }, .{ 1, 24 } }, .kind = .{ .symbol = "addI32" } },
+                                                                    .func = &.{ .span = .{ .{ 1, 16 }, .{ 1, 22 } }, .kind = .{ .symbol = "addI32" } },
                                                                     .args = &.{
-                                                                        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "x" } },
-                                                                        .{ .span = .{ .{ 1, 27 }, .{ 1, 28 } }, .kind = .{ .symbol = "y" } },
+                                                                        .{ .span = .{ .{ 1, 23 }, .{ 1, 24 } }, .kind = .{ .symbol = "x" } },
+                                                                        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "y" } },
                                                                     },
                                                                 },
                                                             },

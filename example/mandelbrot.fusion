@@ -1,14 +1,14 @@
 update : Complex -> Complex -> Complex
-update = \c, z -> c + z ^ 2
+update = \c z. c + z ^ 2
 
 inBounds : Complex -> Bool
-inBounds = \z -> abs z < 2
+inBounds = \z. abs z < 2
 
 escapeTime : Complex -> Int
-escapeTime = \c ->
+escapeTime = \c.
 	n := 0
 	z := zero
-	for i:1000 ->
+	for i:1000.
 		z := update c z
 		n += if inBounds z then 1 else 0
 	n
@@ -16,5 +16,5 @@ escapeTime = \c ->
 xs = linspace 300 -2.0 1.0
 ys = linspace 200 -1.0 1.0
 
-mandelbrot = for i, j -> escapeTime (Complex xs.i ys.j)
+mandelbrot = for i j. escapeTime (Complex xs.i ys.j)
 

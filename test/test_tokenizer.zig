@@ -148,7 +148,7 @@ test "misc operators" {
 test "single line function" {
     const allocator = std.testing.allocator;
     const source =
-        \\double = \x -> x + x
+        \\double = \x. x + x
     ;
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
@@ -157,10 +157,10 @@ test "single line function" {
         .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
-        .{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .plus },
-        .{ .span = .{ .{ 0, 19 }, .{ 0, 20 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 11 }, .{ 0, 12 } }, .kind = .dot },
+        .{ .span = .{ .{ 0, 13 }, .{ 0, 14 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 0, 15 }, .{ 0, 16 } }, .kind = .plus },
+        .{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqual(expected, actual);
 }
@@ -168,7 +168,7 @@ test "single line function" {
 test "multi line function" {
     const allocator = std.testing.allocator;
     const source =
-        \\double = \x ->
+        \\double = \x.
         \\    x + x
     ;
     const actual = try tokenizeAlloc(source, allocator);
@@ -178,7 +178,7 @@ test "multi line function" {
         .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 11 }, .{ 0, 12 } }, .kind = .dot },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 5 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 6 }, .{ 1, 7 } }, .kind = .plus },
@@ -229,7 +229,7 @@ test "function declaration and definition" {
     const allocator = std.testing.allocator;
     const source =
         \\double : F32 -> F32
-        \\double = \x -> x * x
+        \\double = \x. x * x
     ;
     const actual = try tokenizeAlloc(source, allocator);
     defer allocator.free(actual);
@@ -244,10 +244,10 @@ test "function declaration and definition" {
         .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 1, 9 }, .{ 1, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 1, 12 }, .{ 1, 14 } }, .kind = .right_arrow },
-        .{ .span = .{ .{ 1, 15 }, .{ 1, 16 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 1, 17 }, .{ 1, 18 } }, .kind = .star },
-        .{ .span = .{ .{ 1, 19 }, .{ 1, 20 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .dot },
+        .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 15 }, .{ 1, 16 } }, .kind = .star },
+        .{ .span = .{ .{ 1, 17 }, .{ 1, 18 } }, .kind = .{ .symbol = "x" } },
     };
     try expectEqual(expected, actual);
 }
@@ -255,7 +255,7 @@ test "function declaration and definition" {
 test "multiple indentations in one function" {
     const allocator = std.testing.allocator;
     const source =
-        \\sumSquares = \x y ->
+        \\sumSquares = \x y.
         \\    x2 = x ^ 2
         \\    y2 = y ^ 2
         \\    x2 + y2
@@ -268,7 +268,7 @@ test "multiple indentations in one function" {
         .{ .span = .{ .{ 0, 13 }, .{ 0, 14 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 14 }, .{ 0, 15 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 0, 16 }, .{ 0, 17 } }, .kind = .{ .symbol = "y" } },
-        .{ .span = .{ .{ 0, 18 }, .{ 0, 20 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 17 }, .{ 0, 18 } }, .kind = .dot },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 1, 4 }, .{ 1, 6 } }, .kind = .{ .symbol = "x2" } },
         .{ .span = .{ .{ 1, 7 }, .{ 1, 8 } }, .kind = .equal },
@@ -327,7 +327,7 @@ test "string" {
 test "indent using tab" {
     const allocator = std.testing.allocator;
     const source =
-        \\double = \x ->
+        \\double = \x.
         \\	x + x
     ;
     const actual = try tokenizeAlloc(source, allocator);
@@ -337,7 +337,7 @@ test "indent using tab" {
         .{ .span = .{ .{ 0, 7 }, .{ 0, 8 } }, .kind = .equal },
         .{ .span = .{ .{ 0, 9 }, .{ 0, 10 } }, .kind = .backslash },
         .{ .span = .{ .{ 0, 10 }, .{ 0, 11 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 0, 12 }, .{ 0, 14 } }, .kind = .right_arrow },
+        .{ .span = .{ .{ 0, 11 }, .{ 0, 12 } }, .kind = .dot },
         .{ .span = .{ .{ 1, 0 }, .{ 1, 1 } }, .kind = .{ .indent = .{ .tab = 1 } } },
         .{ .span = .{ .{ 1, 1 }, .{ 1, 2 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 3 }, .{ 1, 4 } }, .kind = .plus },
@@ -397,7 +397,7 @@ test "instance" {
     const allocator = std.testing.allocator;
     const source =
         \\instance Add I32
-        \\    add = \x y -> addI32 x y
+        \\    add = \x y. addI32 x y
         \\    zero = 0
     ;
     const actual = try tokenizeAlloc(source, allocator);
@@ -412,10 +412,10 @@ test "instance" {
         .{ .span = .{ .{ 1, 10 }, .{ 1, 11 } }, .kind = .backslash },
         .{ .span = .{ .{ 1, 11 }, .{ 1, 12 } }, .kind = .{ .symbol = "x" } },
         .{ .span = .{ .{ 1, 13 }, .{ 1, 14 } }, .kind = .{ .symbol = "y" } },
-        .{ .span = .{ .{ 1, 15 }, .{ 1, 17 } }, .kind = .right_arrow },
-        .{ .span = .{ .{ 1, 18 }, .{ 1, 24 } }, .kind = .{ .symbol = "addI32" } },
-        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "x" } },
-        .{ .span = .{ .{ 1, 27 }, .{ 1, 28 } }, .kind = .{ .symbol = "y" } },
+        .{ .span = .{ .{ 1, 14 }, .{ 1, 15 } }, .kind = .dot },
+        .{ .span = .{ .{ 1, 16 }, .{ 1, 22 } }, .kind = .{ .symbol = "addI32" } },
+        .{ .span = .{ .{ 1, 23 }, .{ 1, 24 } }, .kind = .{ .symbol = "x" } },
+        .{ .span = .{ .{ 1, 25 }, .{ 1, 26 } }, .kind = .{ .symbol = "y" } },
         .{ .span = .{ .{ 2, 0 }, .{ 2, 4 } }, .kind = .{ .indent = .{ .space = 4 } } },
         .{ .span = .{ .{ 2, 4 }, .{ 2, 8 } }, .kind = .{ .symbol = "zero" } },
         .{ .span = .{ .{ 2, 9 }, .{ 2, 10 } }, .kind = .equal },

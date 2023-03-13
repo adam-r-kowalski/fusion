@@ -136,11 +136,11 @@ fn lambda(context: Context, backslash: Token) !Expression {
     var params = std.ArrayList(Expression).init(context.allocator);
     const highest = withPrecedence(context, HIGHEST);
     while (peekToken(highest.tokens)) |token| {
-        if (token.kind == .right_arrow) break;
+        if (token.kind == .dot) break;
         const param = try expression(highest);
         try params.append(param);
     }
-    _ = expect(context, .right_arrow);
+    _ = expect(context, .dot);
     const body = try block(context);
     return .{
         .span = .{ backslash.span[0], last(body).span[1] },
@@ -167,11 +167,11 @@ fn for_(context: Context, lhs: Token) !Expression {
     var indices = std.ArrayList(Expression).init(context.allocator);
     const highest = withPrecedence(context, HIGHEST);
     while (peekToken(highest.tokens)) |token| {
-        if (token.kind == .right_arrow) break;
+        if (token.kind == .dot) break;
         const param = try expression(highest);
         try indices.append(param);
     }
-    _ = expect(context, .right_arrow);
+    _ = expect(context, .dot);
     const body = try block(context);
     return .{
         .span = .{ lhs.span[0], last(body).span[1] },
