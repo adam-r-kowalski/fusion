@@ -14,6 +14,7 @@ const combine = type_check.combine;
 const Fresh = type_check.Fresh;
 const instantiate = type_check.instantiate;
 const diff = type_check.diff;
+const generalise = type_check.generalise;
 
 const Indent = usize;
 
@@ -25,8 +26,8 @@ fn indent(writer: anytype, i: Indent) !void {
     }
 }
 
-fn writeMonoType(writer: anytype, m: MonoType, i: Indent) !void {
-    try indent(writer, i);
+fn writeMonoType(writer: anytype, m: MonoType, i: Indent, new_line: bool) !void {
+    if (new_line) try indent(writer, i);
     try writer.writeAll(".{");
     try indent(writer, i + 1);
     switch (m) {
@@ -39,7 +40,7 @@ fn writeMonoType(writer: anytype, m: MonoType, i: Indent) !void {
             try writer.writeAll(".args = &.{");
             if (f.args.len > 0) {
                 for (f.args) |arg| {
-                    try writeMonoType(writer, arg, i + 3);
+                    try writeMonoType(writer, arg, i + 3, true);
                 }
                 try indent(writer, i + 2);
             }
@@ -56,7 +57,7 @@ fn writeMonoTypeAlloc(m: MonoType, a: Allocator) ![]const u8 {
     var list = std.ArrayList(u8).init(a);
     const writer = list.writer();
     try writer.writeAll("\n");
-    try writeMonoType(writer, m, 0);
+    try writeMonoType(writer, m, 0, true);
     return list.toOwnedSlice();
 }
 
@@ -65,6 +66,47 @@ fn expectEqualMonoTypes(expected: MonoType, actual: MonoType) !void {
     const actualString = try writeMonoTypeAlloc(actual, allocator);
     defer allocator.free(actualString);
     const expectedString = try writeMonoTypeAlloc(expected, allocator);
+    defer allocator.free(expectedString);
+    try std.testing.expectEqualStrings(expectedString, actualString);
+}
+
+fn writePolyType(writer: anytype, p: PolyType, i: Indent, new_line: bool) !void {
+    if (new_line) try indent(writer, i);
+    try writer.writeAll(".{");
+    try indent(writer, i + 1);
+    switch (p) {
+        .mono_type => |m| {
+            try writer.writeAll(".mono_type = ");
+            try writeMonoType(writer, m, i + 1, false);
+        },
+        .type_quantifier => |q| {
+            try writer.writeAll(".type_quantifier = .{");
+            try indent(writer, i + 2);
+            try std.fmt.format(writer, ".name = \"{s}\",", .{q.name});
+            try indent(writer, i + 2);
+            try writer.writeAll(".sigma = &");
+            try writePolyType(writer, q.sigma.*, i + 2, false);
+            try indent(writer, i + 1);
+            try writer.writeAll("},");
+        },
+    }
+    try indent(writer, i);
+    try writer.writeAll("},");
+}
+
+fn writePolyTypeAlloc(p: PolyType, a: Allocator) ![]const u8 {
+    var list = std.ArrayList(u8).init(a);
+    const writer = list.writer();
+    try writer.writeAll("\n");
+    try writePolyType(writer, p, 0, true);
+    return list.toOwnedSlice();
+}
+
+fn expectEqualPolyTypes(expected: PolyType, actual: PolyType) !void {
+    const allocator = std.testing.allocator;
+    const actualString = try writePolyTypeAlloc(actual, allocator);
+    defer allocator.free(actualString);
+    const expectedString = try writePolyTypeAlloc(expected, allocator);
     defer allocator.free(expectedString);
     try std.testing.expectEqualStrings(expectedString, actualString);
 }
@@ -289,4 +331,28 @@ test "diff" {
     defer a.free(ysDiffXs);
     try expectEqual(ysDiffXs.len, 1);
     try expectEqualStrings("d", ysDiffXs[0]);
+}
+
+test "generalise does not create quantifier if in context" {
+    const a = std.testing.allocator;
+    var c = try makeContext(a, &.{.{ "x", .{ .mono_type = .{ .type_variable = "t0" } } }});
+    defer c.deinit();
+    const actual = try generalise(a, c, .{ .type_variable = "t0" });
+    const expected = .{ .mono_type = .{ .type_variable = "t0" } };
+    try expectEqualPolyTypes(expected, actual);
+}
+
+test "generalise creates quantifier if not in context" {
+    const a = std.testing.allocator;
+    var c = try makeContext(a, &.{.{ "x", .{ .mono_type = .{ .type_variable = "t0" } } }});
+    defer c.deinit();
+    const actual = try generalise(a, c, .{ .type_variable = "t1" });
+    defer a.destroy(actual.type_quantifier.sigma);
+    const expected = .{
+        .type_quantifier = .{
+            .name = "t1",
+            .sigma = &.{ .mono_type = .{ .type_variable = "t1" } },
+        },
+    };
+    try expectEqualPolyTypes(expected, actual);
 }

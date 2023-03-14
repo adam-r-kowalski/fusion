@@ -143,7 +143,7 @@ pub fn diff(a: Allocator, x: []const []const u8, y: []const []const u8) ![][]con
     return result.toOwnedSlice();
 }
 
-fn freeVarsMonoTypeImpl(a: std.ArrayList([]const u8), m: MonoType) !void {
+fn freeVarsMonoTypeImpl(a: *std.ArrayList([]const u8), m: MonoType) !void {
     switch (m) {
         .type_variable => |v| try a.append(v),
         .type_function_application => |f| {
@@ -152,43 +152,48 @@ fn freeVarsMonoTypeImpl(a: std.ArrayList([]const u8), m: MonoType) !void {
     }
 }
 
-fn freeVarsContextImpl(a: std.ArrayList([]const u8), c: Context) !void {
+fn freeVarsContextImpl(a: *std.ArrayList([]const u8), c: Context) !void {
     var iterator = c.valueIterator();
-    while (iterator.next()) |p| try freeVarsPolyType(a, p);
+    while (iterator.next()) |p| try freeVarsPolyTypeImpl(a, p.*);
 }
 
-fn freeVarsPolyTypeImpl(a: std.ArrayList([]const u8), p: PolyType) !void {
+fn freeVarsPolyTypeImpl(a: *std.ArrayList([]const u8), p: PolyType) !void {
     switch (p) {
         .mono_type => |m| try freeVarsMonoTypeImpl(a, m),
         .type_quantifier => |q| {
-            const result = std.ArrayList([]const u8).init(a.allocator);
+            var result = std.ArrayList([]const u8).init(a.allocator);
             defer result.deinit();
-            freeVarsPolyTypeImpl(result, q.sigma);
-            for (result) |v| if (v != q.name) try a.append(v);
+            try freeVarsPolyTypeImpl(&result, q.sigma.*);
+            for (result.items) |v| if (!std.mem.eql(u8, v, q.name)) try a.append(v);
         },
     }
 }
 
 fn freeVarsMonoType(a: Allocator, m: MonoType) ![][]const u8 {
     var result = std.ArrayList([]const u8).init(a);
-    try freeVarsMonoTypeImpl(result, m);
+    try freeVarsMonoTypeImpl(&result, m);
     return result.toOwnedSlice();
 }
 
 fn freeVarsPolyType(a: Allocator, p: PolyType) ![][]const u8 {
     var result = std.ArrayList([]const u8).init(a);
-    try freeVarsPolyTypeImpl(result, p);
+    try freeVarsPolyTypeImpl(&result, p);
     return result.toOwnedSlice();
 }
 
 fn freeVarsContext(a: Allocator, c: Context) ![][]const u8 {
     var result = std.ArrayList([]const u8).init(a);
-    try freeVarsContextImpl(result, c);
+    try freeVarsContextImpl(&result, c);
     return result.toOwnedSlice();
 }
 
-pub fn generalise(a: Allocator, c: Context, m: MonoType) PolyType {
-    const quantifiers = diff(freeVarsMonoType(m), freeVarsContext(c));
+pub fn generalise(a: Allocator, c: Context, m: MonoType) !PolyType {
+    const fvm = try freeVarsMonoType(a, m);
+    defer a.free(fvm);
+    const fvc = try freeVarsContext(a, c);
+    defer a.free(fvc);
+    const quantifiers = try diff(a, fvm, fvc);
+    defer a.free(quantifiers);
     var p: PolyType = .{ .mono_type = m };
     for (quantifiers) |q| {
         const sigma = try a.create(PolyType);
