@@ -7,8 +7,12 @@ const type_check = fusion.type_check;
 const makeContext = type_check.makeContext;
 const makeSubstitution = type_check.makeSubstitution;
 const MonoType = type_check.MonoType;
+const PolyType = type_check.PolyType;
 const applyToMonoType = type_check.applyToMonoType;
 const combine = type_check.combine;
+const Mappings = type_check.Mappings;
+const Fresh = type_check.Fresh;
+const instantiate = type_check.instantiate;
 
 const Indent = usize;
 
@@ -166,14 +170,109 @@ test "combine function application substitutions" {
     defer s2.deinit();
     var s = try combine(a, s1, s2);
     defer s.deinit();
-    const actual = try applyToMonoType(a, s, .{ .type_variable = "z" });
-    defer a.free(actual.type_function_application.args);
-    const expected = .{
+    const actual1 = try applyToMonoType(a, s, .{ .type_variable = "z" });
+    defer a.free(actual1.type_function_application.args);
+    const expected1 = .{
         .type_function_application = .{
             .func = "->",
             .args = &.{
                 .{ .type_function_application = .{ .func = "Bool", .args = &.{} } },
                 .{ .type_variable = "y" },
+            },
+        },
+    };
+    try expectEqualMonoTypes(expected1, actual1);
+    const actual2 = try applyToMonoType(a, s, .{ .type_variable = "x" });
+    const expected2 = .{ .type_variable = "y" };
+    try expectEqualMonoTypes(expected2, actual2);
+}
+
+test "instantiate type variable" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var m = Mappings.init(a);
+    var f = .{ .a = a, .current = 0 };
+    const t = PolyType{
+        .type_quantifier = .{
+            .name = "z",
+            .sigma = &.{ .mono_type = .{ .type_variable = "z" } },
+        },
+    };
+    const actual = try instantiate(a, t, &m, &f);
+    const expected = .{ .type_variable = "0" };
+    try expectEqualMonoTypes(expected, actual);
+}
+
+test "instantiate function application" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var m = Mappings.init(a);
+    var f = .{ .a = a, .current = 0 };
+    const t = PolyType{
+        .type_quantifier = .{
+            .name = "z",
+            .sigma = &.{
+                .mono_type = .{
+                    .type_function_application = .{
+                        .func = "->",
+                        .args = &.{
+                            .{ .type_variable = "z" },
+                            .{ .type_variable = "z" },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    const actual = try instantiate(a, t, &m, &f);
+    const expected = .{
+        .type_function_application = .{
+            .func = "->",
+            .args = &.{
+                .{ .type_variable = "0" },
+                .{ .type_variable = "0" },
+            },
+        },
+    };
+    try expectEqualMonoTypes(expected, actual);
+}
+
+test "instantiate nested type quantifier" {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var m = Mappings.init(a);
+    var f = .{ .a = a, .current = 0 };
+    const t = PolyType{
+        .type_quantifier = .{
+            .name = "y",
+            .sigma = &.{
+                .type_quantifier = .{
+                    .name = "z",
+                    .sigma = &.{
+                        .mono_type = .{
+                            .type_function_application = .{
+                                .func = "->",
+                                .args = &.{
+                                    .{ .type_variable = "z" },
+                                    .{ .type_variable = "y" },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    const actual = try instantiate(a, t, &m, &f);
+    const expected = .{
+        .type_function_application = .{
+            .func = "->",
+            .args = &.{
+                .{ .type_variable = "1" },
+                .{ .type_variable = "0" },
             },
         },
     };

@@ -4,7 +4,7 @@ const fusion = @import("fusion");
 fn outputWat() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
     const module = &.{
         .{
             .func = .{
