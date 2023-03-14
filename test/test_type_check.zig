@@ -11,7 +11,6 @@ const MonoType = type_check.MonoType;
 const PolyType = type_check.PolyType;
 const applyToMonoType = type_check.applyToMonoType;
 const combine = type_check.combine;
-const Mappings = type_check.Mappings;
 const Fresh = type_check.Fresh;
 const instantiate = type_check.instantiate;
 const diff = type_check.diff;
@@ -190,28 +189,23 @@ test "combine function application substitutions" {
 }
 
 test "instantiate type variable" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const a = arena.allocator();
-    var m = Mappings.init(a);
-    var f = .{ .a = a, .current = 0 };
+    var a = std.testing.allocator;
+    var f = Fresh{ .current = 0 };
     const t = PolyType{
         .type_quantifier = .{
             .name = "z",
             .sigma = &.{ .mono_type = .{ .type_variable = "z" } },
         },
     };
-    const actual = try instantiate(a, t, &m, &f);
+    const actual = try instantiate(a, t, &f);
+    defer a.free(actual.type_variable);
     const expected = .{ .type_variable = "0" };
     try expectEqualMonoTypes(expected, actual);
 }
 
 test "instantiate function application" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const a = arena.allocator();
-    var m = Mappings.init(a);
-    var f = .{ .a = a, .current = 0 };
+    var a = std.testing.allocator;
+    var f = Fresh{ .current = 0 };
     const t = PolyType{
         .type_quantifier = .{
             .name = "z",
@@ -228,7 +222,9 @@ test "instantiate function application" {
             },
         },
     };
-    const actual = try instantiate(a, t, &m, &f);
+    const actual = try instantiate(a, t, &f);
+    defer a.free(actual.type_function_application.args);
+    defer a.free(actual.type_function_application.args[0].type_variable);
     const expected = .{
         .type_function_application = .{
             .func = "->",
@@ -242,11 +238,8 @@ test "instantiate function application" {
 }
 
 test "instantiate nested type quantifier" {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const a = arena.allocator();
-    var m = Mappings.init(a);
-    var f = .{ .a = a, .current = 0 };
+    var a = std.testing.allocator;
+    var f = Fresh{ .current = 0 };
     const t = PolyType{
         .type_quantifier = .{
             .name = "y",
@@ -268,7 +261,10 @@ test "instantiate nested type quantifier" {
             },
         },
     };
-    const actual = try instantiate(a, t, &m, &f);
+    const actual = try instantiate(a, t, &f);
+    defer a.free(actual.type_function_application.args);
+    defer a.free(actual.type_function_application.args[0].type_variable);
+    defer a.free(actual.type_function_application.args[1].type_variable);
     const expected = .{
         .type_function_application = .{
             .func = "->",

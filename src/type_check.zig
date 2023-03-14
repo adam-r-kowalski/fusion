@@ -88,20 +88,19 @@ pub fn combine(a: Allocator, s1: Substitution, s2: Substitution) !Substitution {
     return s;
 }
 
-pub const Mappings = std.StringHashMap(TypeVariable);
+const Mappings = std.StringHashMap(TypeVariable);
 
 pub const Fresh = struct {
-    a: Allocator,
     current: u64,
 };
 
-fn newTypeVar(fresh: *Fresh) ![]const u8 {
-    const name = try std.fmt.allocPrint(fresh.a, "{}", .{fresh.current});
+fn newTypeVar(a: Allocator, fresh: *Fresh) ![]const u8 {
+    const name = try std.fmt.allocPrint(a, "{}", .{fresh.current});
     fresh.current += 1;
     return name;
 }
 
-pub fn instantiate(a: Allocator, t: PolyType, m: *Mappings, f: *Fresh) !MonoType {
+pub fn instantiateImpl(a: Allocator, t: PolyType, m: *Mappings, f: *Fresh) !MonoType {
     switch (t) {
         .mono_type => |mono| {
             switch (mono) {
@@ -112,18 +111,24 @@ pub fn instantiate(a: Allocator, t: PolyType, m: *Mappings, f: *Fresh) !MonoType
                 .type_function_application => |app| {
                     const args = try a.alloc(MonoType, app.args.len);
                     for (app.args) |arg, i| {
-                        args[i] = try instantiate(a, .{ .mono_type = arg }, m, f);
+                        args[i] = try instantiateImpl(a, .{ .mono_type = arg }, m, f);
                     }
                     return .{ .type_function_application = .{ .func = app.func, .args = args } };
                 },
             }
         },
         .type_quantifier => |q| {
-            const b = try newTypeVar(f);
+            const b = try newTypeVar(a, f);
             try m.put(q.name, b);
-            return try instantiate(a, q.sigma.*, m, f);
+            return try instantiateImpl(a, q.sigma.*, m, f);
         },
     }
+}
+
+pub fn instantiate(a: Allocator, t: PolyType, f: *Fresh) !MonoType {
+    var m = Mappings.init(a);
+    defer m.deinit();
+    return instantiateImpl(a, t, &m, f);
 }
 
 pub fn diff(a: Allocator, x: []const []const u8, y: []const []const u8) ![][]const u8 {
