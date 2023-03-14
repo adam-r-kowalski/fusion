@@ -75,3 +75,13 @@ fn applyToPolyType(a: Allocator, s: Substitution, t: PolyType) PolyType {
         },
     };
 }
+
+pub fn combine(a: Allocator, s1: Substitution, s2: Substitution) !Substitution {
+    var s = try s1.cloneWithAllocator(a);
+    var iterator = s2.iterator();
+    while (iterator.next()) |entry| {
+        const value = try applyToMonoType(a, s1, entry.value_ptr.*);
+        try s.put(entry.key_ptr.*, value);
+    }
+    return s;
+}

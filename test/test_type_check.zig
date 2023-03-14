@@ -8,6 +8,7 @@ const makeContext = type_check.makeContext;
 const makeSubstitution = type_check.makeSubstitution;
 const MonoType = type_check.MonoType;
 const applyToMonoType = type_check.applyToMonoType;
+const combine = type_check.combine;
 
 const Indent = usize;
 
@@ -110,6 +111,64 @@ test "apply substitution to type function application" {
     });
     defer a.free(actual.type_function_application.args);
     const expected: MonoType = .{
+        .type_function_application = .{
+            .func = "->",
+            .args = &.{
+                .{ .type_function_application = .{ .func = "Bool", .args = &.{} } },
+                .{ .type_variable = "y" },
+            },
+        },
+    };
+    try expectEqualMonoTypes(expected, actual);
+}
+
+test "apply substitution to mono type creating a type function application" {
+    const a = std.testing.allocator;
+    var s = try makeSubstitution(a, &.{
+        .{ "x", .{ .type_function_application = .{ .func = "Bool", .args = &.{} } } },
+    });
+    defer s.deinit();
+    const actual = try applyToMonoType(a, s, .{ .type_variable = "x" });
+    const expected = .{ .type_function_application = .{ .func = "Bool", .args = &.{} } };
+    try expectEqualMonoTypes(expected, actual);
+}
+
+test "combine substitutions" {
+    const a = std.testing.allocator;
+    var s1 = try makeSubstitution(a, &.{.{ "y", .{ .type_variable = "z" } }});
+    defer s1.deinit();
+    var s2 = try makeSubstitution(a, &.{.{ "x", .{ .type_variable = "y" } }});
+    defer s2.deinit();
+    var s = try combine(a, s1, s2);
+    defer s.deinit();
+    const actual = try applyToMonoType(a, s, .{ .type_variable = "x" });
+    const expected = .{ .type_variable = "z" };
+    try expectEqualMonoTypes(expected, actual);
+}
+
+test "combine function application substitutions" {
+    const a = std.testing.allocator;
+    var s1 = try makeSubstitution(a, &.{.{ "x", .{ .type_variable = "y" } }});
+    defer s1.deinit();
+    var s2 = try makeSubstitution(a, &.{
+        .{
+            "z", .{
+                .type_function_application = .{
+                    .func = "->",
+                    .args = &.{
+                        .{ .type_function_application = .{ .func = "Bool", .args = &.{} } },
+                        .{ .type_variable = "x" },
+                    },
+                },
+            },
+        },
+    });
+    defer s2.deinit();
+    var s = try combine(a, s1, s2);
+    defer s.deinit();
+    const actual = try applyToMonoType(a, s, .{ .type_variable = "z" });
+    defer a.free(actual.type_function_application.args);
+    const expected = .{
         .type_function_application = .{
             .func = "->",
             .args = &.{
