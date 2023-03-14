@@ -1,5 +1,6 @@
 const std = @import("std");
 const expectEqualStrings = std.testing.expectEqualStrings;
+const expectEqual = std.testing.expectEqual;
 const Allocator = std.mem.Allocator;
 
 const fusion = @import("fusion");
@@ -13,6 +14,7 @@ const combine = type_check.combine;
 const Mappings = type_check.Mappings;
 const Fresh = type_check.Fresh;
 const instantiate = type_check.instantiate;
+const diff = type_check.diff;
 
 const Indent = usize;
 
@@ -277,4 +279,18 @@ test "instantiate nested type quantifier" {
         },
     };
     try expectEqualMonoTypes(expected, actual);
+}
+
+test "diff" {
+    const a = std.testing.allocator;
+    const xs = &.{ "a", "b", "c" };
+    const ys = &.{ "b", "c", "d" };
+    const xsDiffYs = try diff(a, xs, ys);
+    defer a.free(xsDiffYs);
+    try expectEqual(xsDiffYs.len, 1);
+    try expectEqualStrings("a", xsDiffYs[0]);
+    const ysDiffXs = try diff(a, ys, xs);
+    defer a.free(ysDiffXs);
+    try expectEqual(ysDiffXs.len, 1);
+    try expectEqualStrings("d", ysDiffXs[0]);
 }

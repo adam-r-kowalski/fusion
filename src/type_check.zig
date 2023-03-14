@@ -125,3 +125,34 @@ pub fn instantiate(a: Allocator, t: PolyType, m: *Mappings, f: *Fresh) !MonoType
         },
     }
 }
+
+pub fn diff(a: Allocator, x: []const []const u8, y: []const []const u8) ![][]const u8 {
+    var m = std.StringHashMap(void).init(a);
+    defer m.deinit();
+    for (y) |e| try m.put(e, {});
+    var result = std.ArrayList([]const u8).init(a);
+    for (x) |e| {
+        if (m.contains(e)) continue;
+        try result.append(e);
+    }
+    return result.toOwnedSlice();
+}
+
+fn freeVarsMonoType(_: MonoType) u8 {
+    return 0;
+}
+
+fn freeVarsContext(_: Context) u8 {
+    return 0;
+}
+
+pub fn generalise(a: Allocator, c: Context, m: MonoType) PolyType {
+    const quantifiers = diff(freeVarsMonoType(m), freeVarsContext(c));
+    var p: PolyType = .{ .mono_type = m };
+    for (quantifiers) |q| {
+        const sigma = try a.create(PolyType);
+        sigma.* = p;
+        p = .{ .type_quantifier = .{ .name = q, .sigma = sigma } };
+    }
+    return p;
+}
